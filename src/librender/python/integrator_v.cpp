@@ -27,7 +27,7 @@ public:
 
     PySamplingIntegrator(const Properties &props) : SamplingIntegrator(props) { }
 
-    std::pair<Spectrum, Mask> sample(const Scene *scene,
+    std::pair<std::pair<Spectrum, Mask>, Float> sample(const Scene *scene,
                                      Sampler *sampler,
                                      const RayDifferential3f &ray,
                                      Float *aovs,
@@ -41,7 +41,7 @@ public:
                 = overload(scene, sampler, ray, active).template cast<PyReturn>();
 
             std::copy(aovs_.begin(), aovs_.end(), aovs);
-            return { spec, mask };
+            return { { spec, mask }, 0.0f };
         } else {
             Throw("SamplingIntegrator doesn't overload the method \"sample\"");
         }

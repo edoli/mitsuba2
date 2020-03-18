@@ -22,11 +22,13 @@ class MTS_EXPORT_RENDER Film : public Object {
 public:
     MTS_IMPORT_TYPES(ImageBlock, ReconstructionFilter)
 
+    int m_num_images = 100;
+
     /// Configure the film for rendering a specified set of channels
     virtual void prepare(const std::vector<std::string> &channels) = 0;
 
     /// Merge an image block into the film
-    virtual void put(const ImageBlock *block) = 0;
+    virtual void put(const std::vector<ref<ImageBlock>> blocks) = 0;
 
     /// Develop the film and write the result to the previously specified filename
     virtual void develop() = 0;

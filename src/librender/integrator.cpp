@@ -24,6 +24,10 @@ NAMESPACE_BEGIN(mitsuba)
 MTS_VARIANT SamplingIntegrator<Float, Spectrum>::SamplingIntegrator(const Properties &props)
     : Base(props) {
     m_block_size = (uint32_t) props.size_("block_size", MTS_BLOCK_SIZE);
+
+    m_min_distance = props.float_("min_distance", 4.0f);
+    m_max_distance = props.float_("max_distance", 5.0f);
+
     uint32_t block_size = math::round_to_power_of_two(m_block_size);
     if (block_size != m_block_size) {
         m_block_size = block_size;
@@ -97,9 +101,17 @@ MTS_VARIANT bool SamplingIntegrator<Float, Spectrum>::render(Scene *scene, Senso
             [&](const tbb::blocked_range<size_t> &range) {
                 ScopedSetThreadEnvironment set_env(env);
                 ref<Sampler> sampler = sensor->sampler()->clone();
-                ref<ImageBlock> block = new ImageBlock(m_block_size, channels.size(),
-                                                       film->reconstruction_filter(),
-                                                       !has_aovs);
+
+                int num_blocks = film->m_num_images;
+
+                std::vector<ref<ImageBlock>> blocks;
+                for (auto i = 0; i < num_blocks; ++i) {
+                    ref<ImageBlock> block = new ImageBlock(
+                        m_block_size, channels.size(),
+                        film->reconstruction_filter(), !has_aovs);
+                    blocks.push_back(block);
+                }
+
                 scoped_flush_denormals flush_denormals(true);
                 std::unique_ptr<Float[]> aovs(new Float[channels.size()]);
 
@@ -107,16 +119,20 @@ MTS_VARIANT bool SamplingIntegrator<Float, Spectrum>::render(Scene *scene, Senso
                 for (auto i = range.begin(); i != range.end() && !should_stop(); ++i) {
                     auto [offset, size] = spiral.next_block();
                     Assert(hprod(size) != 0);
-                    block->set_size(size);
-                    block->set_offset(offset);
+
+                    for (auto i = 0; i < num_blocks; ++i) {
+                        auto block = blocks[i];
+                        block->set_size(size);
+                        block->set_offset(offset);
+                    }
 
                     // Ensure that the sample generation is fully deterministic
                     sampler->seed(i);
 
-                    render_block(scene, sensor, sampler, block,
+                    render_block(scene, sensor, sampler, blocks,
                                  aovs.get(), samples_per_pass);
 
-                    film->put(block);
+                    film->put(blocks);
 
                     /* Critical section: update progress bar */ {
                         std::lock_guard<std::mutex> lock(mutex);
@@ -163,10 +179,13 @@ MTS_VARIANT bool SamplingIntegrator<Float, Spectrum>::render(Scene *scene, Senso
 MTS_VARIANT void SamplingIntegrator<Float, Spectrum>::render_block(const Scene *scene,
                                                                    const Sensor *sensor,
                                                                    Sampler *sampler,
-                                                                   ImageBlock *block,
+                                                                   std::vector<ref<ImageBlock>> blocks,
                                                                    Float *aovs,
                                                                    size_t sample_count_) const {
-    block->clear();
+    for (auto it = blocks.begin(); it != blocks.end(); ++it) {
+        auto block = *it;
+        block->clear();
+    }
     uint32_t pixel_count  = (uint32_t)(m_block_size * m_block_size),
              sample_count = (uint32_t)(sample_count_ == (size_t) -1
                                            ? sampler->sample_count()
@@ -177,12 +196,12 @@ MTS_VARIANT void SamplingIntegrator<Float, Spectrum>::render_block(const Scene *
     if constexpr (!is_array_v<Float>) {
         for (uint32_t i = 0; i < pixel_count && !should_stop(); ++i) {
             ScalarPoint2u pos = enoki::morton_decode<ScalarPoint2u>(i);
-            if (any(pos >= block->size()))
+            if (any(pos >= blocks[0]->size()))
                 continue;
 
-            pos += block->offset();
+            pos += blocks[0]->offset();
             for (uint32_t j = 0; j < sample_count && !should_stop(); ++j) {
-                render_sample(scene, sensor, sampler, block, aovs,
+                render_sample(scene, sensor, sampler, blocks, aovs,
                               pos, diff_scale_factor);
             }
         }
@@ -191,9 +210,9 @@ MTS_VARIANT void SamplingIntegrator<Float, Spectrum>::render_block(const Scene *
             if (should_stop())
                 break;
             Point2u pos = enoki::morton_decode<Point2u>(index / UInt32(sample_count));
-            active &= !any(pos >= block->size());
-            pos += block->offset();
-            render_sample(scene, sensor, sampler, block, aovs, pos, diff_scale_factor, active);
+            active &= !any(pos >= blocks[0]->size());
+            pos += blocks[0]->offset();
+            render_sample(scene, sensor, sampler, blocks, aovs, pos, diff_scale_factor, active);
         }
     } else {
         ENOKI_MARK_USED(scene);
@@ -205,7 +224,7 @@ MTS_VARIANT void SamplingIntegrator<Float, Spectrum>::render_block(const Scene *
 }
 
 MTS_VARIANT void SamplingIntegrator<Float, Spectrum>::render_sample(
-    const Scene *scene, const Sensor *sensor, Sampler *sampler, ImageBlock *block,
+    const Scene *scene, const Sensor *sensor, Sampler *sampler, std::vector<ref<ImageBlock>> blocks,
     Float *aovs, const Vector2f &pos, ScalarFloat diff_scale_factor, Mask active) const {
     Vector2f position_sample = pos + sampler->next_2d(active);
 
@@ -228,7 +247,9 @@ MTS_VARIANT void SamplingIntegrator<Float, Spectrum>::render_sample(
 
     ray.scale_differential(diff_scale_factor);
 
-    std::pair<Spectrum, Mask> result = sample(scene, sampler, ray, aovs + 5, active);
+    std::pair<std::pair<Spectrum, Mask>, float> sampled = sample(scene, sampler, ray, aovs + 5, active);
+    std::pair<Spectrum, Mask> result = sampled.first;
+    Float path_length = sampled.second;
     result.first = ray_weight * result.first;
 
     UnpolarizedSpectrum spec_u = depolarize(result.first);
@@ -249,10 +270,22 @@ MTS_VARIANT void SamplingIntegrator<Float, Spectrum>::render_sample(
     aovs[3] = select(result.second, Float(1.f), Float(0.f));
     aovs[4] = 1.f;
 
+    // Jeon: Find distance and put corresponding block
+    const Film* film = sensor->film();
+    int num_images = film->m_num_images;
+    auto min_dist = m_min_distance;
+    int index = (int) (((path_length - m_min_distance) * num_images) / (m_max_distance - m_min_distance));
+
+    if (index < 0 || index >= num_images) {
+        index = 0;
+    }
+    auto block = blocks[index];
     block->put(position_sample, aovs, active);
+
+    // blocks[0]->put(position_sample, aovs, active);
 }
 
-MTS_VARIANT std::pair<Spectrum, typename SamplingIntegrator<Float, Spectrum>::Mask>
+MTS_VARIANT std::pair<std::pair<Spectrum, typename SamplingIntegrator<Float, Spectrum>::Mask>, Float>
 SamplingIntegrator<Float, Spectrum>::sample(const Scene * /* scene */,
                                             Sampler * /* sampler */,
                                             const RayDifferential3f & /* ray */,
@@ -276,6 +309,8 @@ MTS_VARIANT MonteCarloIntegrator<Float, Spectrum>::MonteCarloIntegrator(const Pr
     m_max_depth = props.int_("max_depth", -1);
     if (m_max_depth < 0 && m_max_depth != -1)
         Throw("\"max_depth\" must be set to -1 (infinite) or a value >= 0");
+
+    
 
     /// Disable direct visibility of emitters if needed
     m_hide_emitters = props.bool_("hide_emitters", false);

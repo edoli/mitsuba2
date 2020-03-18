@@ -102,17 +102,23 @@ public:
         m_frac_lum    = m_emitter_samples / (ScalarFloat) sum;
     }
 
-    std::pair<Spectrum, Mask> sample(const Scene *scene,
+    std::pair<std::pair<Spectrum, Mask>, Float> sample(const Scene *scene,
                                      Sampler *sampler,
                                      const RayDifferential3f &ray,
                                      Float * /* aovs */,
                                      Mask active) const override {
         MTS_MASKED_FUNCTION(ProfilerPhase::SamplingIntegratorSample, active);
+        
+        // JEON: Distance accumulated traveled along the ray
+        Float acc_t(0.0f);
+        Float inf = math::Infinity<Float>;
 
         SurfaceInteraction3f si = scene->ray_intersect(ray, active);
+        acc_t += si.t;
         Mask valid_ray = si.is_valid();
 
         Spectrum result(0.f);
+
 
         // ----------------------- Visible emitters -----------------------
 
@@ -122,7 +128,7 @@ public:
 
         active &= si.is_valid();
         if (none_or<false>(active))
-            return { result, valid_ray };
+            return { { result, valid_ray }, 0.0f };
 
         // ----------------------- Emitter sampling -----------------------
 
@@ -167,6 +173,7 @@ public:
             // Trace the ray in the sampled direction and intersect against the scene
             SurfaceInteraction si_bsdf =
                 scene->ray_intersect(si.spawn_ray(si.to_world(bs.wo)), active_b);
+            acc_t += si_bsdf.t;
 
             // Retain only rays that hit an emitter
             EmitterPtr emitter = si_bsdf.emitter(scene, active_b);
@@ -191,7 +198,7 @@ public:
             }
         }
 
-        return { result, valid_ray };
+        return { { result, valid_ray }, acc_t };
     }
 
     std::string to_string() const override {

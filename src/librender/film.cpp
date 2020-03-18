@@ -24,6 +24,8 @@ MTS_VARIANT Film<Float, Spectrum>::Film(const Properties &props) : Object() {
         props.int_("crop_height", m_size.y())
     );
 
+    m_num_images = props.int_("num_images", 100);
+
     set_crop_window(crop_offset, crop_size);
 
     /* If set to true, regions slightly outside of the film plane will also be

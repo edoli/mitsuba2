@@ -106,7 +106,7 @@ public:
      *        (spec, mask, aov) = integrator.sample(scene, sampler, ray, active)
      *    </tt>
      */
-    virtual std::pair<Spectrum, Mask> sample(const Scene *scene,
+    virtual std::pair<std::pair<Spectrum, Mask>, Float> sample(const Scene *scene,
                                              Sampler *sampler,
                                              const RayDifferential3f &ray,
                                              Float *aovs = nullptr,
@@ -150,14 +150,14 @@ protected:
     virtual void render_block(const Scene *scene,
                               const Sensor *sensor,
                               Sampler *sampler,
-                              ImageBlock *block,
+                              std::vector<ref<ImageBlock>> blocks,
                               Float *aovs,
                               size_t sample_count = size_t(-1)) const;
 
     void render_sample(const Scene *scene,
                        const Sensor *sensor,
                        Sampler *sampler,
-                       ImageBlock *block,
+                       std::vector<ref<ImageBlock>> blocks,
                        Float *aovs,
                        const Vector2f &pos,
                        ScalarFloat diff_scale_factor,
@@ -169,6 +169,9 @@ protected:
 
     /// Size of (square) image blocks to render per core.
     uint32_t m_block_size;
+
+    float m_min_distance = 4.0f;
+    float m_max_distance = 5.0f;
 
     /**
      * \brief Number of samples to compute for each pass over the image blocks.

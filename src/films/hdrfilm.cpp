@@ -194,22 +194,31 @@ public:
                 Throw("Film::prepare(): duplicate channel name \"%s\"", channels[i]);
         }
 
-        m_storage = new ImageBlock(m_crop_size, channels.size());
-        m_storage->set_offset(m_crop_offset);
-        m_storage->clear();
+        
+        for (auto i = 0; i < m_num_images; ++i) {
+            ref<ImageBlock> block = new ImageBlock(m_crop_size, channels.size());
+            block->set_offset(m_crop_offset);
+            block->clear();
+            m_storages.push_back(block);
+        }
         m_channels = channels;
     }
 
-    void put(const ImageBlock *block) override {
-        Assert(m_storage != nullptr);
-        m_storage->put(block);
+    void put(const std::vector<ref<ImageBlock>> blocks) override {
+        Assert(m_storages != nullptr);
+        int num_blocks = blocks.size();
+        for (int i = 0; i < num_blocks; ++i) {
+            ref<ImageBlock> block = blocks[i];
+            ref<ImageBlock> storage = m_storages[i];
+            storage->put(block);
+        }
     }
 
     bool develop(const ScalarPoint2i  &source_offset,
                  const ScalarVector2i &size,
                  const ScalarPoint2i  &target_offset,
                  Bitmap *target) const override {
-        Assert(m_storage != nullptr);
+        Assert(m_storages != nullptr);
         (void) source_offset;
         (void) size;
         (void) target_offset;
@@ -242,17 +251,24 @@ public:
 #endif
         return true;
     }
-
-    ref<Bitmap> bitmap(bool raw = false) override {
+    ref<Bitmap> bitmap(bool raw = false) {
         if constexpr (is_cuda_array_v<Float>) {
             cuda_eval();
             cuda_sync();
         }
 
-        ref<Bitmap> source = new Bitmap(m_channels.size() != 5 ? Bitmap::PixelFormat::MultiChannel
-                                                               : Bitmap::PixelFormat::XYZAW,
-                          struct_type_v<ScalarFloat>, m_storage->size(), m_storage->channel_count(),
-                          (uint8_t *) m_storage->data().managed().data());
+        ref<ImageBlock> block = new ImageBlock(m_storages[0]->size(), m_storages[0]->channel_count());
+        for (auto i = 0; i < m_num_images; ++i) {
+            block->put(m_storages[i]);
+        }
+
+
+        ref<Bitmap> source = new Bitmap(
+            m_channels.size() != 5 ? Bitmap::PixelFormat::MultiChannel
+                                   : Bitmap::PixelFormat::XYZAW,
+            struct_type_v<ScalarFloat>, block->size(),
+            block->channel_count(),
+            (uint8_t *) block->data().managed().data());
 
         if (raw)
             return source;
@@ -261,8 +277,75 @@ public:
 
         ref<Bitmap> target = new Bitmap(
             has_aovs ? Bitmap::PixelFormat::MultiChannel : m_pixel_format,
-            m_component_format, m_storage->size(),
-            has_aovs ? (m_storage->channel_count() - 1): 0);
+            m_component_format, block->size(),
+            has_aovs ? (block->channel_count() - 1) : 0);
+
+        if (has_aovs) {
+            for (size_t i = 0, j = 0; i < m_channels.size(); ++i, ++j) {
+                Struct::Field &source_field = source->struct_()->operator[](i),
+                              &dest_field   = target->struct_()->operator[](j);
+
+                switch (i) {
+                    case 0:
+                        dest_field.name  = "R";
+                        dest_field.blend = { { 3.240479f, "X" },
+                                             { -1.537150f, "Y" },
+                                             { -0.498535f, "Z" } };
+                        break;
+
+                    case 1:
+                        dest_field.name  = "G";
+                        dest_field.blend = { { -0.969256, "X" },
+                                             { 1.875991, "Y" },
+                                             { 0.041556, "Z" } };
+                        break;
+
+                    case 2:
+                        dest_field.name  = "B";
+                        dest_field.blend = { { 0.055648, "X" },
+                                             { -0.204043, "Y" },
+                                             { 1.057311, "Z" } };
+                        break;
+
+                    case 4:
+                        source_field.flags |= +Struct::Flags::Weight;
+                        j--;
+                        break;
+
+                    default:
+                        dest_field.name = m_channels[i];
+                        break;
+                }
+
+                source_field.name = m_channels[i];
+            }
+        }
+
+        source->convert(target);
+
+        return target;
+    }
+
+    ref<Bitmap> bitmap2(bool raw = false, int index = 0) {
+        if constexpr (is_cuda_array_v<Float>) {
+            cuda_eval();
+            cuda_sync();
+        }
+
+        ref<Bitmap> source = new Bitmap(m_channels.size() != 5 ? Bitmap::PixelFormat::MultiChannel
+                                                               : Bitmap::PixelFormat::XYZAW,
+                          struct_type_v<ScalarFloat>, m_storages[0]->size(), m_storages[0]->channel_count(),
+                          (uint8_t *) m_storages[index]->data().managed().data());
+
+        if (raw)
+            return source;
+
+        bool has_aovs = m_channels.size() != 5;
+
+        ref<Bitmap> target = new Bitmap(
+            has_aovs ? Bitmap::PixelFormat::MultiChannel : m_pixel_format,
+            m_component_format, m_storages[0]->size(),
+            has_aovs ? (m_storages[0]->channel_count() - 1): 0);
 
         if (has_aovs) {
             for (size_t i = 0, j = 0; i < m_channels.size(); ++i, ++j) {
@@ -335,7 +418,30 @@ public:
 
         Log(Info, "\U00002714  Developing \"%s\" ..", filename.string());
 
+        // Jeon: Original RGB image
         bitmap()->write(filename, m_file_format);
+
+        // Jeon: Time divided images
+        for (auto i = 1; i < m_num_images; ++i) {
+            std::string fnstr = filename.string();
+            std::string t = fnstr.substr(0, fnstr.find("."));
+            char buffer[50];
+            snprintf(buffer, 50, "%s_%04d.exr", t.c_str(), i);
+            std::string fn = buffer;
+            fs::path filepath(fn);
+            filepath.replace_extension(filename.extension());
+            bitmap2(false, i)->write(filepath, m_file_format);
+        }
+
+        // Jeon: Remain paths
+        std::string fnstr = filename.string();
+        std::string t = fnstr.substr(0, fnstr.find("."));
+        char buffer[50];
+        snprintf(buffer, 50, "%s_remain.exr", t.c_str());
+        std::string fn = buffer;
+        fs::path filepath(fn);
+        filepath.replace_extension(filename.extension());
+        bitmap2(false, 0)->write(filepath, m_file_format);
     }
 
     bool destination_exists(const fs::path &base_name) const override {
@@ -378,7 +484,7 @@ protected:
     Bitmap::PixelFormat m_pixel_format;
     Struct::Type m_component_format;
     fs::path m_dest_file;
-    ref<ImageBlock> m_storage;
+    std::vector<ref<ImageBlock>> m_storages;
     std::vector<std::string> m_channels;
 };
 

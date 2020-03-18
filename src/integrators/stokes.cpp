@@ -76,14 +76,14 @@ public:
             Throw("Must specify a sub-integrator!");
     }
 
-    std::pair<Spectrum, Mask> sample(const Scene *scene,
+    std::pair<std::pair<Spectrum, Mask>, Float> sample(const Scene *scene,
                                      Sampler * sampler,
                                      const RayDifferential3f &ray,
                                      Float *aovs,
                                      Mask active) const override {
         MTS_MASKED_FUNCTION(ProfilerPhase::SamplingIntegratorSample, active);
 
-        auto result = m_integrator->sample(scene, sampler, ray, aovs + 12, active);
+        auto result = m_integrator->sample(scene, sampler, ray, aovs + 12, active).first;
 
         if constexpr (is_polarized_v<Spectrum>) {
             auto const &stokes = result.first.coeff(0);
@@ -105,7 +105,7 @@ public:
             }
         }
 
-        return result;
+        return { result, 0.0f };
     }
 
     std::vector<std::string> aov_names() const override {
