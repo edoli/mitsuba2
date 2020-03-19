@@ -16,7 +16,7 @@ public:
 
     DepthIntegrator(const Properties &props) : Base(props) { }
 
-    std::pair<std::pair<Spectrum, Mask>, Float> sample(const Scene *scene,
+    std::vector<std::pair<std::pair<Spectrum, Mask>, Float>> sample(const Scene *scene,
                                      Sampler * /* sampler */,
                                      const RayDifferential3f &ray,
                                      Float * /* aovs */,
@@ -25,7 +25,7 @@ public:
 
         SurfaceInteraction3f si = scene->ray_intersect(ray, active);
 
-        return { { select(si.is_valid(), si.t, 0.f), si.is_valid() }, 0.0f };
+        return {{ { select(si.is_valid(), si.t, 0.f), si.is_valid() }, 0.0f }};
     }
 
     MTS_DECLARE_CLASS()

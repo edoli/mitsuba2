@@ -103,7 +103,7 @@ public:
 
     PathIntegrator(const Properties &props) : Base(props) {}
 
-    std::pair<std::pair<Spectrum, Mask>, Float> sample(const Scene *scene, Sampler *sampler,
+    std::vector<std::pair<std::pair<Spectrum, Mask>, Float>> sample(const Scene *scene, Sampler *sampler,
                                      const RayDifferential3f &ray_,
                                      Float * /* aovs */,
                                      Mask active) const override {
@@ -117,7 +117,9 @@ public:
         // MIS weight for intersected emitters (set by prev. iteration)
         Float emission_weight(1.f);
 
-        Spectrum throughput(1.f), result(0.f);
+        Spectrum throughput(1.f);
+
+        std::vector<std::pair<std::pair<Spectrum, Mask>, Float>> results;
         
         // JEON: Distance accumulated traveled along the ray
         Float acc_t(0.0f);
@@ -134,9 +136,11 @@ public:
 
             // ---------------- Intersection with emitters ----------------
 
-            if (any_or<true>(neq(emitter, nullptr)) && !emitter->is_environment())
-                result[active] +=
-                    emission_weight * throughput * emitter->eval(si, active);
+            if (any_or<true>(neq(emitter, nullptr)) && !emitter->is_environment()) {
+                Spectrum result(0.f);
+                result[active] += emission_weight * throughput * emitter->eval(si, active);
+                results.push_back({ { result, valid_ray }, acc_t });
+            }
 
             active &= si.is_valid();
 
@@ -180,7 +184,10 @@ public:
                 Float bsdf_pdf = bsdf->pdf(ctx, si, wo, active_e);
 
                 Float mis = select(ds.delta, 1.f, mis_weight(ds.pdf, bsdf_pdf));
+
+                Spectrum result(0.f);
                 result[active_e] += mis * throughput * bsdf_val * emitter_val;
+                results.push_back({ { result, valid_ray }, acc_t });
             }
 
             // ----------------------- BSDF sampling ----------------------
@@ -219,23 +226,8 @@ public:
 
             si = std::move(si_bsdf);
         }
-        // if (acc_t == inf) {
-        //     acc_t = 0.0f;
-        // }
-        // if (acc_t >= m_distance + m_bandwidth || acc_t < m_distance) {
-            // result[0] = 0;
-            // result[1] = 0;
-            // result[2] = 0;
-            // result[3] = 0;
-        // }
-        // std::cout << acc_t << ":" << result << "," << valid_ray << "\n";
-
-        // Spectrum depth_wise = Spectrum<float, 4>(0.0f);
-        // Spectrum depth_wise(10);
-        // using Depthwise = Spectrum<float, 4>;
-        // std::cout << depth_wise << "\n";
         
-        return { { result, valid_ray }, acc_t };
+        return results;
     }
 
     //! @}

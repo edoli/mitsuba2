@@ -102,7 +102,7 @@ public:
         m_frac_lum    = m_emitter_samples / (ScalarFloat) sum;
     }
 
-    std::pair<std::pair<Spectrum, Mask>, Float> sample(const Scene *scene,
+    std::vector<std::pair<std::pair<Spectrum, Mask>, Float>> sample(const Scene *scene,
                                      Sampler *sampler,
                                      const RayDifferential3f &ray,
                                      Float * /* aovs */,
@@ -128,7 +128,7 @@ public:
 
         active &= si.is_valid();
         if (none_or<false>(active))
-            return { { result, valid_ray }, 0.0f };
+            return { { { result, valid_ray }, 0.0f } };
 
         // ----------------------- Emitter sampling -----------------------
 
@@ -198,7 +198,7 @@ public:
             }
         }
 
-        return { { result, valid_ray }, acc_t };
+        return { { { result, valid_ray }, acc_t } };
     }
 
     std::string to_string() const override {

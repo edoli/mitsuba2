@@ -81,7 +81,7 @@ public:
         return m;
     }
 
-    std::pair<std::pair<Spectrum, Mask>, Float> sample(const Scene *scene,
+    std::vector<std::pair<std::pair<Spectrum, Mask>, Float>> sample(const Scene *scene,
                                      Sampler *sampler,
                                      const RayDifferential3f &ray_,
                                      Float * /* aovs */,
@@ -316,7 +316,7 @@ public:
             active &= (active_surface | active_medium);
         }
 
-        return { { result, valid_ray } , 0.0f };
+        return { { { result, valid_ray }, 0.0f } };
     }
 
 

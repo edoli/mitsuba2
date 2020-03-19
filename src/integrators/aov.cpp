@@ -129,7 +129,7 @@ public:
             Log(Warn, "No AOVs were specified!");
     }
 
-    std::pair<std::pair<Spectrum, Mask>, Float> sample(const Scene *scene,
+    std::vector<std::pair<std::pair<Spectrum, Mask>, Float>> sample(const Scene *scene,
                                      Sampler * sampler,
                                      const RayDifferential3f &ray,
                                      Float *aovs,
@@ -174,7 +174,7 @@ public:
 
                 case Type::IntegratorRGBA: {
                         std::pair<Spectrum, Mask> result_sub =
-                            m_integrators[ctr].first->sample(scene, sampler, ray, aovs, active).first;
+                            m_integrators[ctr].first->sample(scene, sampler, ray, aovs, active)[0].first;
                         aovs += m_integrators[ctr].second;
 
                         UnpolarizedSpectrum spec_u = depolarize(result_sub.first);
@@ -204,7 +204,7 @@ public:
             }
         }
 
-        return { result, 0.0f };
+        return { { result, 0.0f } };
     }
 
     std::vector<std::string> aov_names() const override {

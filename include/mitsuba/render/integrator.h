@@ -106,7 +106,7 @@ public:
      *        (spec, mask, aov) = integrator.sample(scene, sampler, ray, active)
      *    </tt>
      */
-    virtual std::pair<std::pair<Spectrum, Mask>, Float> sample(const Scene *scene,
+    virtual std::vector<std::pair<std::pair<Spectrum, Mask>, Float>> sample(const Scene *scene,
                                              Sampler *sampler,
                                              const RayDifferential3f &ray,
                                              Float *aovs = nullptr,

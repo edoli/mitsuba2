@@ -21,7 +21,9 @@ NAMESPACE_BEGIN(mitsuba)
 
 // -----------------------------------------------------------------------------
 
-MTS_VARIANT SamplingIntegrator<Float, Spectrum>::SamplingIntegrator(const Properties &props)
+MTS_VARIANT SamplingIntegrator<Float, Spectrum>::
+
+SamplingIntegrator(const Properties &props)
     : Base(props) {
     m_block_size = (uint32_t) props.size_("block_size", MTS_BLOCK_SIZE);
 
@@ -249,45 +251,48 @@ MTS_VARIANT void SamplingIntegrator<Float, Spectrum>::render_sample(
 
     ray.scale_differential(diff_scale_factor);
 
-    std::pair<std::pair<Spectrum, Mask>, float> sampled = sample(scene, sampler, ray, aovs + 5, active);
-    std::pair<Spectrum, Mask> result = sampled.first;
-    Float path_length = sampled.second;
-    result.first = ray_weight * result.first;
+    std::vector<std::pair<std::pair<Spectrum, Mask>, Float>> sampled = sample(scene, sampler, ray, aovs + 5, active);
+    for (int i = 0; i < sampled.size(); ++i) {
+        std::pair<std::pair<Spectrum, Mask>, Float> single_sample = sampled[i];
+        std::pair<Spectrum, Mask> result = single_sample.first;
+        Float path_length                = single_sample.second;
+        result.first                     = ray_weight * result.first;
 
-    UnpolarizedSpectrum spec_u = depolarize(result.first);
+        UnpolarizedSpectrum spec_u = depolarize(result.first);
 
-    Color3f xyz;
-    if constexpr (is_monochromatic_v<Spectrum>) {
-        xyz = spec_u.x();
-    } else if constexpr (is_rgb_v<Spectrum>) {
-        xyz = srgb_to_xyz(spec_u, active);
-    } else {
-        static_assert(is_spectral_v<Spectrum>);
-        xyz = spectrum_to_xyz(spec_u, ray.wavelengths, active);
+        Color3f xyz;
+        if constexpr (is_monochromatic_v<Spectrum>) {
+            xyz = spec_u.x();
+        } else if constexpr (is_rgb_v<Spectrum>) {
+            xyz = srgb_to_xyz(spec_u, active);
+        } else {
+            static_assert(is_spectral_v<Spectrum>);
+            xyz = spectrum_to_xyz(spec_u, ray.wavelengths, active);
+        }
+
+        aovs[0] = xyz.x();
+        aovs[1] = xyz.y();
+        aovs[2] = xyz.z();
+        aovs[3] = select(result.second, Float(1.f), Float(0.f));
+        aovs[4] = 1.f;
+
+        // Jeon: Find distance and put corresponding block
+        const Film *film = sensor->film();
+        int num_images   = film->m_num_images;
+        auto min_dist    = m_min_distance;
+        int index = (int) (((path_length - m_min_distance) * num_images) /
+                           (m_max_distance - m_min_distance));
+
+        if (index < 0 || index >= num_images) {
+            index = 0;
+        }
+        auto block = (*blocks)[index];
+        block->put(position_sample, aovs, active);
     }
-
-    aovs[0] = xyz.x();
-    aovs[1] = xyz.y();
-    aovs[2] = xyz.z();
-    aovs[3] = select(result.second, Float(1.f), Float(0.f));
-    aovs[4] = 1.f;
-
-    // Jeon: Find distance and put corresponding block
-    const Film* film = sensor->film();
-    int num_images = film->m_num_images;
-    auto min_dist = m_min_distance;
-    int index = (int) (((path_length - m_min_distance) * num_images) / (m_max_distance - m_min_distance));
-
-    if (index < 0 || index >= num_images) {
-        index = 0;
-    }
-    auto block = (*blocks)[index];
-    block->put(position_sample, aovs, active);
 
     // blocks[0]->put(position_sample, aovs, active);
 }
-
-MTS_VARIANT std::pair<std::pair<Spectrum, typename SamplingIntegrator<Float, Spectrum>::Mask>, Float>
+MTS_VARIANT std::vector<std::pair<std::pair<Spectrum, typename SamplingIntegrator<Float, Spectrum>::Mask>, Float>>
 SamplingIntegrator<Float, Spectrum>::sample(const Scene * /* scene */,
                                             Sampler * /* sampler */,
                                             const RayDifferential3f & /* ray */,
