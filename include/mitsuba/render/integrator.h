@@ -150,14 +150,14 @@ protected:
     virtual void render_block(const Scene *scene,
                               const Sensor *sensor,
                               Sampler *sampler,
-                              std::vector<ref<ImageBlock>> blocks,
+                              std::vector<ref<ImageBlock>> *blocks,
                               Float *aovs,
                               size_t sample_count = size_t(-1)) const;
 
     void render_sample(const Scene *scene,
                        const Sensor *sensor,
                        Sampler *sampler,
-                       std::vector<ref<ImageBlock>> blocks,
+                       std::vector<ref<ImageBlock>> *blocks,
                        Float *aovs,
                        const Vector2f &pos,
                        ScalarFloat diff_scale_factor,
