@@ -187,7 +187,7 @@ public:
 
                 Spectrum result(0.f);
                 result[active_e] += mis * throughput * bsdf_val * emitter_val;
-                results.push_back({ { result, valid_ray }, acc_t });
+                results.push_back({ { result, valid_ray }, acc_t + ds.dist });
             }
 
             // ----------------------- BSDF sampling ----------------------
