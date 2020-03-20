@@ -251,9 +251,10 @@ MTS_VARIANT void SamplingIntegrator<Float, Spectrum>::render_sample(
 
     ray.scale_differential(diff_scale_factor);
 
-    std::vector<std::pair<std::pair<Spectrum, Mask>, Float>> sampled = sample(scene, sampler, ray, aovs + 5, active);
-    for (int i = 0; i < sampled.size(); ++i) {
-        std::pair<std::pair<Spectrum, Mask>, Float> single_sample = sampled[i];
+    std::vector<std::pair<std::pair<Spectrum, Mask>, Float>> samples;
+    sample(&samples, scene, sampler, ray, aovs + 5, active);
+    for (int i = 0; i < samples.size(); ++i) {
+        std::pair<std::pair<Spectrum, Mask>, Float> single_sample = samples[i];
         std::pair<Spectrum, Mask> result = single_sample.first;
         Float path_length                = single_sample.second;
         result.first                     = ray_weight * result.first;
@@ -292,8 +293,9 @@ MTS_VARIANT void SamplingIntegrator<Float, Spectrum>::render_sample(
 
     // blocks[0]->put(position_sample, aovs, active);
 }
-MTS_VARIANT std::vector<std::pair<std::pair<Spectrum, typename SamplingIntegrator<Float, Spectrum>::Mask>, Float>>
-SamplingIntegrator<Float, Spectrum>::sample(const Scene * /* scene */,
+MTS_VARIANT void
+SamplingIntegrator<Float, Spectrum>::sample(std::vector<std::pair<std::pair<Spectrum, Mask>, Float>> *samples, 
+                                            const Scene * /* scene */,
                                             Sampler * /* sampler */,
                                             const RayDifferential3f & /* ray */,
                                             Float * /* aovs */,

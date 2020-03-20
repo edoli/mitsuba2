@@ -16,16 +16,17 @@ public:
 
     DepthIntegrator(const Properties &props) : Base(props) { }
 
-    std::vector<std::pair<std::pair<Spectrum, Mask>, Float>> sample(const Scene *scene,
-                                     Sampler * /* sampler */,
-                                     const RayDifferential3f &ray,
-                                     Float * /* aovs */,
-                                     Mask active) const override {
+    void sample(std::vector<std::pair<std::pair<Spectrum, Mask>, Float>> *samples, 
+                const Scene *scene,
+                Sampler * /* sampler */,
+                const RayDifferential3f &ray,
+                Float * /* aovs */,
+                Mask active) const override {
         MTS_MASKED_FUNCTION(ProfilerPhase::SamplingIntegratorSample, active);
 
         SurfaceInteraction3f si = scene->ray_intersect(ray, active);
 
-        return {{ { select(si.is_valid(), si.t, 0.f), si.is_valid() }, 0.0f }};
+        samples->push_back({ { select(si.is_valid(), si.t, 0.f), si.is_valid() }, 0.0f });
     }
 
     MTS_DECLARE_CLASS()

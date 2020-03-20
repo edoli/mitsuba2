@@ -81,11 +81,12 @@ public:
         return m;
     }
 
-    std::vector<std::pair<std::pair<Spectrum, Mask>, Float>> sample(const Scene *scene,
-                                     Sampler *sampler,
-                                     const RayDifferential3f &ray_,
-                                     Float * /* aovs */,
-                                     Mask active) const override {
+    void sample(std::vector<std::pair<std::pair<Spectrum, Mask>, Float>> *samples,
+                const Scene *scene,
+                Sampler *sampler,
+                const RayDifferential3f &ray_,
+                Float * /* aovs */,
+                Mask active) const override {
         MTS_MASKED_FUNCTION(ProfilerPhase::SamplingIntegratorSample, active);
         if constexpr (is_polarized_v<Spectrum>) {
             Throw("This integrator currently does not support polarized mode!");
@@ -316,7 +317,7 @@ public:
             active &= (active_surface | active_medium);
         }
 
-        return { { { result, valid_ray }, 0.0f } };
+        samples->push_back({ { result, valid_ray }, 0.0f });
     }
 
 

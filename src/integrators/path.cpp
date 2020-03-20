@@ -103,10 +103,11 @@ public:
 
     PathIntegrator(const Properties &props) : Base(props) {}
 
-    std::vector<std::pair<std::pair<Spectrum, Mask>, Float>> sample(const Scene *scene, Sampler *sampler,
-                                     const RayDifferential3f &ray_,
-                                     Float * /* aovs */,
-                                     Mask active) const override {
+    void sample(std::vector<std::pair<std::pair<Spectrum, Mask>, Float>> *samples, 
+                const Scene *scene, Sampler *sampler,
+                const RayDifferential3f &ray_,
+                Float * /* aovs */,
+                Mask active) const override {
         MTS_MASKED_FUNCTION(ProfilerPhase::SamplingIntegratorSample, active);
 
         RayDifferential3f ray = ray_;
@@ -118,9 +119,7 @@ public:
         Float emission_weight(1.f);
 
         Spectrum throughput(1.f);
-
-        std::vector<std::pair<std::pair<Spectrum, Mask>, Float>> results;
-        
+                
         // JEON: Distance accumulated traveled along the ray
         Float acc_t(0.0f);
         Float inf = math::Infinity<Float>;
@@ -139,7 +138,7 @@ public:
             if (any_or<true>(neq(emitter, nullptr)) && !emitter->is_environment()) {
                 Spectrum result(0.f);
                 result[active] += emission_weight * throughput * emitter->eval(si, active);
-                results.push_back({ { result, valid_ray }, acc_t });
+                samples->push_back({ { result, valid_ray }, acc_t });
             }
 
             active &= si.is_valid();
@@ -187,7 +186,7 @@ public:
 
                 Spectrum result(0.f);
                 result[active_e] += mis * throughput * bsdf_val * emitter_val;
-                results.push_back({ { result, valid_ray }, acc_t + ds.dist });
+                samples->push_back({ { result, valid_ray }, acc_t + ds.dist });
             }
 
             // ----------------------- BSDF sampling ----------------------
@@ -226,8 +225,6 @@ public:
 
             si = std::move(si_bsdf);
         }
-        
-        return results;
     }
 
     //! @}

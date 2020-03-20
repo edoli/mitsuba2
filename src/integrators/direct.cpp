@@ -102,11 +102,12 @@ public:
         m_frac_lum    = m_emitter_samples / (ScalarFloat) sum;
     }
 
-    std::vector<std::pair<std::pair<Spectrum, Mask>, Float>> sample(const Scene *scene,
-                                     Sampler *sampler,
-                                     const RayDifferential3f &ray,
-                                     Float * /* aovs */,
-                                     Mask active) const override {
+    void sample(std::vector<std::pair<std::pair<Spectrum, Mask>, Float>> *samples, 
+                const Scene *scene,
+                Sampler *sampler,
+                const RayDifferential3f &ray,
+                Float * /* aovs */,
+                Mask active) const override {
         MTS_MASKED_FUNCTION(ProfilerPhase::SamplingIntegratorSample, active);
         
         // JEON: Distance accumulated traveled along the ray
@@ -127,8 +128,9 @@ public:
             result += emitter_vis->eval(si, active);
 
         active &= si.is_valid();
-        if (none_or<false>(active))
-            return { { { result, valid_ray }, 0.0f } };
+        if (none_or<false>(active)) {
+            samples->push_back({ { result, valid_ray }, 0.0f });
+        }
 
         // ----------------------- Emitter sampling -----------------------
 
@@ -198,7 +200,7 @@ public:
             }
         }
 
-        return { { { result, valid_ray }, acc_t } };
+        samples->push_back({ { result, valid_ray }, acc_t });
     }
 
     std::string to_string() const override {

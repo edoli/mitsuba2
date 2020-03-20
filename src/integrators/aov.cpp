@@ -129,11 +129,12 @@ public:
             Log(Warn, "No AOVs were specified!");
     }
 
-    std::vector<std::pair<std::pair<Spectrum, Mask>, Float>> sample(const Scene *scene,
-                                     Sampler * sampler,
-                                     const RayDifferential3f &ray,
-                                     Float *aovs,
-                                     Mask active) const override {
+    void sample(std::vector<std::pair<std::pair<Spectrum, Mask>, Float>> *samples, 
+                const Scene *scene,
+                Sampler * sampler,
+                const RayDifferential3f &ray,
+                Float *aovs,
+                Mask active) const override {
         MTS_MASKED_FUNCTION(ProfilerPhase::SamplingIntegratorSample, active);
 
         std::pair<Spectrum, Mask> result { 0.f, false };
@@ -171,40 +172,10 @@ public:
                     *aovs++ = si.sh_frame.n.y();
                     *aovs++ = si.sh_frame.n.z();
                     break;
-
-                case Type::IntegratorRGBA: {
-                        std::pair<Spectrum, Mask> result_sub =
-                            m_integrators[ctr].first->sample(scene, sampler, ray, aovs, active)[0].first;
-                        aovs += m_integrators[ctr].second;
-
-                        UnpolarizedSpectrum spec_u = depolarize(result_sub.first);
-
-                        Color3f rgb;
-                        if constexpr (is_monochromatic_v<Spectrum>) {
-                            rgb = spec_u.x();
-                        } else if constexpr (is_rgb_v<Spectrum>) {
-                            rgb = spec_u;
-                        } else {
-                            static_assert(is_spectral_v<Spectrum>);
-                            /// Note: this assumes that sensor used sample_rgb_spectrum() to generate 'ray.wavelengths'
-                            auto pdf = pdf_rgb_spectrum(ray.wavelengths);
-                            spec_u *= select(neq(pdf, 0.f), rcp(pdf), 0.f);
-                            rgb = xyz_to_srgb(spectrum_to_xyz(spec_u, ray.wavelengths, active));
-                        }
-
-                        *aovs++ = rgb.r(); *aovs++ = rgb.g(); *aovs++ = rgb.b();
-                        *aovs++ = select(result_sub.second, Float(1.f), Float(0.f));
-
-                        if (ctr == 0)
-                            result = result_sub;
-
-                        ctr++;
-                    }
-                    break;
             }
         }
 
-        return { { result, 0.0f } };
+        samples->push_back({ result, 0.0f });
     }
 
     std::vector<std::string> aov_names() const override {

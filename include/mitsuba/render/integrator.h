@@ -106,11 +106,12 @@ public:
      *        (spec, mask, aov) = integrator.sample(scene, sampler, ray, active)
      *    </tt>
      */
-    virtual std::vector<std::pair<std::pair<Spectrum, Mask>, Float>> sample(const Scene *scene,
-                                             Sampler *sampler,
-                                             const RayDifferential3f &ray,
-                                             Float *aovs = nullptr,
-                                             Mask active = true) const;
+    virtual void sample(std::vector<std::pair<std::pair<Spectrum, Mask>, Float>> *samples, 
+                        const Scene *scene,
+                        Sampler *sampler,
+                        const RayDifferential3f &ray,
+                        Float *aovs = nullptr,
+                        Mask active = true) const;
 
     /**
      * For integrators that return one or more arbitrary output variables
