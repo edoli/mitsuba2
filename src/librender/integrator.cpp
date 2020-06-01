@@ -97,6 +97,7 @@ MTS_VARIANT bool SamplingIntegrator<Float, Spectrum>::render(Scene *scene, Senso
         size_t total_blocks = spiral.block_count() * n_passes,
                blocks_done = 0;
 
+        Log(Info, "Total blocks: %d", total_blocks);
         m_render_timer.reset();
         tbb::parallel_for(
             tbb::blocked_range<size_t>(0, total_blocks, 1),

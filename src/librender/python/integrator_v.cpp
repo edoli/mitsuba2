@@ -101,11 +101,11 @@ void bind_integrator_sample(Class &integrator) {
                 set_slices(result_aovs[j], slices(ray));
 
             for (size_t i = 0; i < packets(ray); ++i) {
-                auto [spec, mask] = integrator->sample(scene, sampler, packet(ray, i),
+                /*auto [spec, mask] = integrator->sample(scene, sampler, packet(ray, i),
                                                        aovs_packet.data(),
                                                        packet(active, i));
                 packet(result_spec, i) = spec;
-                packet(result_mask, i) = mask;
+                packet(result_mask, i) = mask;*/
                 for (size_t j = 0; j < result_aovs.size(); ++i)
                     packet(result_aovs[j], i) = aovs_packet[j];
             }
