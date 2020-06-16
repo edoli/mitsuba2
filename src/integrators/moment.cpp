@@ -52,12 +52,13 @@ public:
             m_aov_names.push_back("m2_" + m_aov_names[i]);
     }
 
-    std::pair<Spectrum, Mask> sample(const Scene *scene,
-                                     Sampler * sampler,
-                                     const RayDifferential3f &ray,
-                                     const Medium *medium,
-                                     Float *aovs,
-                                     Mask active) const override {
+    void sample(std::vector<std::pair<std::pair<Spectrum, Mask>, Float>> *samples,
+                const Scene *scene,
+                Sampler * sampler,
+                const RayDifferential3f &ray,
+                const Medium *medium,
+                Float *aovs,
+                Mask active) const override {
         MTS_MASKED_FUNCTION(ProfilerPhase::SamplingIntegratorSample, active);
 
         std::pair<Spectrum, Mask> result { 0.f, false };
@@ -65,8 +66,8 @@ public:
         size_t offset = m_aov_names.size() / 2;
 
         for (size_t i = 0; i < m_integrators.size(); i++) {
-            std::pair<Spectrum, Mask> result_sub =
-                m_integrators[i].first->sample(scene, sampler, ray, medium, aovs, active);
+            m_integrators[i].first->sample(samples, scene, sampler, ray, medium, aovs, active);
+            std::pair<Spectrum, Mask> result_sub = samples->at(0).first;
             aovs += m_integrators[i].second;
 
             UnpolarizedSpectrum spec_u = depolarize(result_sub.first);
@@ -94,7 +95,7 @@ public:
                 result = result_sub;
         }
 
-        return result;
+        samples->push_back({ result, 0.0f });
     }
 
     std::vector<std::string> aov_names() const override {

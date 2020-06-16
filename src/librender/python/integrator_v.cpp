@@ -65,7 +65,7 @@ void bind_integrator_sample(Class &integrator) {
     MTS_IMPORT_OBJECT_TYPES()
 
     /// Python compatibility wrapper around SamplingIntegrator::sample(), default case
-    integrator.def(
+   /* integrator.def(
         "sample",
         [](const SamplingIntegrator *integrator, const Scene *scene, Sampler *sampler,
            const RayDifferential3f &ray, const Medium *medium, Mask active) {
@@ -75,7 +75,7 @@ void bind_integrator_sample(Class &integrator) {
             return std::make_tuple(spec, mask, aovs);
         },
         "scene"_a, "sampler"_a, "ray"_a, "medium"_a = nullptr, "active"_a = true,
-        D(SamplingIntegrator, sample));
+        D(SamplingIntegrator, sample));*/
 }
 
 template <typename FloatP, typename SpectrumP, typename Class,

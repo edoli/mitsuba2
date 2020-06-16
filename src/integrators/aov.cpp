@@ -218,36 +218,6 @@ public:
                     *aovs++ = si.duv_dy.x();
                     *aovs++ = si.duv_dy.y();
                     break;
-
-                case Type::IntegratorRGBA: {
-                        std::pair<Spectrum, Mask> result_sub =
-                            m_integrators[ctr].first->sample(scene, sampler, ray, medium, aovs, active);
-                        aovs += m_integrators[ctr].second;
-
-                        UnpolarizedSpectrum spec_u = depolarize(result_sub.first);
-
-                        Color3f rgb;
-                        if constexpr (is_monochromatic_v<Spectrum>) {
-                            rgb = spec_u.x();
-                        } else if constexpr (is_rgb_v<Spectrum>) {
-                            rgb = spec_u;
-                        } else {
-                            static_assert(is_spectral_v<Spectrum>);
-                            /// Note: this assumes that sensor used sample_rgb_spectrum() to generate 'ray.wavelengths'
-                            auto pdf = pdf_rgb_spectrum(ray.wavelengths);
-                            spec_u *= select(neq(pdf, 0.f), rcp(pdf), 0.f);
-                            rgb = xyz_to_srgb(spectrum_to_xyz(spec_u, ray.wavelengths, active));
-                        }
-
-                        *aovs++ = rgb.r(); *aovs++ = rgb.g(); *aovs++ = rgb.b();
-                        *aovs++ = select(result_sub.second, Float(1.f), Float(0.f));
-
-                        if (ctr == 0)
-                            result = result_sub;
-
-                        ctr++;
-                    }
-                    break;
             }
         }
 
