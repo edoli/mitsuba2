@@ -104,6 +104,7 @@ public:
             props.string("pixel_format", "rgba"));
         std::string component_format = string::to_lower(
             props.string("component_format", "float16"));
+        m_is_raw = props.bool_("is_raw", false);
 
         m_dest_file = props.string("filename", "");
 
@@ -422,7 +423,7 @@ public:
         Log(Info, "\U00002714  Developing \"%s\" ..", filename.string());
 
         // Jeon: Original RGB image
-        bitmap()->write(filename, m_file_format);
+        bitmap(m_is_raw)->write(filename, m_file_format);
 
         // Jeon: Time divided images
         for (auto i = 1; i < m_num_images; ++i) {
@@ -433,7 +434,7 @@ public:
             std::string fn = buffer;
             fs::path filepath(fn);
             filepath.replace_extension(filename.extension());
-            bitmap2(false, i)->write(filepath, m_file_format);
+            bitmap2(m_is_raw, i)->write(filepath, m_file_format);
         }
 
         // Jeon: Remain paths
@@ -486,6 +487,7 @@ protected:
     Bitmap::FileFormat m_file_format;
     Bitmap::PixelFormat m_pixel_format;
     Struct::Type m_component_format;
+    bool m_is_raw;
     fs::path m_dest_file;
     std::vector<ref<ImageBlock>> m_storages;
     std::mutex m_mutex;
