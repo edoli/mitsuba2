@@ -74,11 +74,11 @@ paths of arbitrary length to compute both direct and indirect illumination.
    --------------
 
 .. Triangle meshes often rely on interpolated shading normals
-   to suppress the inherently faceted appearance of the underlying geometry.
-These "fake" normals are not without problems, however. They can lead to
-paradoxical situations where a light ray impinges on an object from a direction
-that is lassified as "outside" according to the shading normal, and "inside"
-according to the true geometric normal.
+   to suppress the inherently faceted appearance of the underlying geometry. These
+   "fake" normals are not without problems, however. They can lead to paradoxical
+   situations where a light ray impinges on an object from a direction that is
+   classified as "outside" according to the shading normal, and "inside" according
+   to the true geometric normal.
 
 .. The :paramtype:`strict_normals` parameter specifies the intended behavior
 when such cases arise. The default (|false|, i.e. "carry on") gives precedence
@@ -99,13 +99,14 @@ template <typename Float, typename Spectrum>
 class PathIntegrator : public MonteCarloIntegrator<Float, Spectrum> {
 public:
     MTS_IMPORT_BASE(MonteCarloIntegrator, m_max_depth, m_rr_depth)
-    MTS_IMPORT_TYPES(Scene, Sampler, Emitter, EmitterPtr, BSDF, BSDFPtr)
+    MTS_IMPORT_TYPES(Scene, Sampler, Medium, Emitter, EmitterPtr, BSDF, BSDFPtr)
 
     PathIntegrator(const Properties &props) : Base(props) {}
 
     void sample(std::vector<std::pair<std::pair<Spectrum, Mask>, Float>> *samples, 
                 const Scene *scene, Sampler *sampler,
                 const RayDifferential3f &ray_,
+                const Medium * /* medium */,
                 Float * /* aovs */,
                 Mask active) const override {
         MTS_MASKED_FUNCTION(ProfilerPhase::SamplingIntegratorSample, active);
@@ -155,7 +156,7 @@ public:
 
             // Stop if we've exceeded the number of requested bounces, or
             // if there are no more active lanes. Only do this latter check
-            // in GPU mode when the number of requested bounces infinite
+            // in GPU mode when the number of requested bounces is infinite
             // since it causes a costly synchronization.
             if ((uint32_t) depth >= (uint32_t) m_max_depth ||
                 ((!is_cuda_array_v<Float> || m_max_depth < 0) && none(active)))
@@ -217,8 +218,9 @@ public:
 
             if (any_or<true>(neq(emitter, nullptr))) {
                 Float emitter_pdf =
-                    select(has_flag(bs.sampled_type, BSDFFlags::Delta), 0.f,
-                           scene->pdf_emitter_direction(si, ds, active));
+                    select(neq(emitter, nullptr) && !has_flag(bs.sampled_type, BSDFFlags::Delta),
+                           scene->pdf_emitter_direction(si, ds),
+                           0.f);
 
                 emission_weight = mis_weight(bs.pdf, emitter_pdf);
             }

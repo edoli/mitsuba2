@@ -20,8 +20,6 @@
 NAMESPACE_BEGIN(mitsuba)
 
 MTS_VARIANT Scene<Float, Spectrum>::Scene(const Properties &props) {
-    std::vector<Emitter *> surface_emitters_to_check;
-
     for (auto &kv : props.objects()) {
         m_children.push_back(kv.second.get());
 
@@ -40,9 +38,7 @@ MTS_VARIANT Scene<Float, Spectrum>::Scene(const Properties &props) {
             m_shapes.push_back(shape);
         } else if (emitter) {
             // Surface emitters will be added to the list when attached to a shape
-            if (has_flag(emitter->flags(), EmitterFlags::Surface))
-                surface_emitters_to_check.push_back(emitter);
-            else
+            if (!has_flag(emitter->flags(), EmitterFlags::Surface))
                 m_emitters.push_back(emitter);
 
             if (emitter->is_environment()) {
@@ -100,12 +96,6 @@ MTS_VARIANT Scene<Float, Spectrum>::Scene(const Properties &props) {
     // Create emitters' shapes (environment luminaires)
     for (Emitter *emitter: m_emitters)
         emitter->set_scene(this);
-
-    // Check that all surface emitters are associated with a shape
-    for (const Emitter *emitter : surface_emitters_to_check) {
-        if (!emitter->shape())
-            Throw("Surface emitter was not attached to any shape: %s", emitter);
-    }
 }
 
 MTS_VARIANT Scene<Float, Spectrum>::~Scene() {
@@ -224,9 +214,9 @@ MTS_VARIANT void Scene<Float, Spectrum>::traverse(TraversalCallback *callback) {
     }
 }
 
-MTS_VARIANT void Scene<Float, Spectrum>::parameters_changed() {
+MTS_VARIANT void Scene<Float, Spectrum>::parameters_changed(const std::vector<std::string> &/*keys*/) {
     if (m_environment)
-        m_environment->set_scene(this);
+        m_environment->set_scene(this); // TODO use parameters_changed({"scene"})
 }
 
 MTS_VARIANT std::string Scene<Float, Spectrum>::to_string() const {
@@ -234,10 +224,10 @@ MTS_VARIANT std::string Scene<Float, Spectrum>::to_string() const {
     oss << "Scene[" << std::endl
         << "  children = [" << std::endl;
     for (size_t i = 0; i < m_children.size(); ++i) {
-        oss << "    " << string::indent(m_children[i]->to_string(), 4);
+        oss << "    " << string::indent(m_children[i], 4);
         if (i + 1 < m_children.size())
             oss << ",";
-        oss << std::endl;
+        oss <<  std::endl;
     }
     oss << "  ]"<< std::endl
         << "]";

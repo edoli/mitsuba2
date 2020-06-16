@@ -68,8 +68,8 @@ or BSDF sampling-only integrator.
 template <typename Float, typename Spectrum>
 class DirectIntegrator : public SamplingIntegrator<Float, Spectrum> {
 public:
-    MTS_IMPORT_BASE(SamplingIntegrator)
-    MTS_IMPORT_TYPES(Scene, Sampler, Emitter, EmitterPtr, BSDF, BSDFPtr)
+    MTS_IMPORT_BASE(SamplingIntegrator, m_hide_emitters)
+    MTS_IMPORT_TYPES(Scene, Sampler, Medium, Emitter, EmitterPtr, BSDF, BSDFPtr)
 
     // =============================================================
     //! @{ \name Constructors
@@ -106,6 +106,7 @@ public:
                 const Scene *scene,
                 Sampler *sampler,
                 const RayDifferential3f &ray,
+                const Medium * /* medium */,
                 Float * /* aovs */,
                 Mask active) const override {
         MTS_MASKED_FUNCTION(ProfilerPhase::SamplingIntegratorSample, active);
@@ -122,10 +123,11 @@ public:
 
 
         // ----------------------- Visible emitters -----------------------
-
-        EmitterPtr emitter_vis = si.emitter(scene, active);
-        if (any_or<true>(neq(emitter_vis, nullptr)))
-            result += emitter_vis->eval(si, active);
+        if (!m_hide_emitters) {
+            EmitterPtr emitter_vis = si.emitter(scene, active);
+            if (any_or<true>(neq(emitter_vis, nullptr)))
+                result += emitter_vis->eval(si, active);
+        }
 
         active &= si.is_valid();
         if (none_or<false>(active)) {

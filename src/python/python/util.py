@@ -1,6 +1,16 @@
 import mitsuba
 
 
+"""
+Returns whether a parameter's type is a differentiable enoki type.
+"""
+def is_differentiable(p):
+    p_type = type(p)
+    return p_type.__module__ == 'enoki.cuda_autodiff' \
+           and not p_type.__name__.endswith('u')      \
+           and not p_type.__name__.endswith('i')
+
+
 class ParameterMap:
     """
     Dictionary-like object that references various parameters used in a Mitsuba
@@ -18,7 +28,7 @@ class ParameterMap:
         """
         self.properties = properties
         self.hierarchy = hierarchy
-        self.update_list = []
+        self.update_list = {}
 
         from mitsuba.core import set_property, get_property
         self.set_property = set_property
@@ -35,7 +45,14 @@ class ParameterMap:
         node = item[2]
         while node is not None:
             parent, depth = self.hierarchy[node]
-            self.update_list.append((depth, node))
+
+            name = key
+            if parent is not None:
+                key, name = key.rsplit('.', 1)
+
+            self.update_list.setdefault((depth, node), [])
+            self.update_list[(depth, node)].append(name)
+
             node = parent
         return self.set_property(item[0], item[1], value)
 
@@ -46,7 +63,11 @@ class ParameterMap:
         return len(self.properties)
 
     def __repr__(self) -> str:
-        return 'ParameterMap[\n    ' + ',\n    '.join(self.keys()) + '\n]'
+        param_list = ''
+        for k in self.keys():
+            param_list += '  %s %s,\n' % (
+                ('*' if is_differentiable(self[k]) else ' '), k)
+        return 'ParameterMap[\n%s]' % param_list
 
     def keys(self):
         return self.properties.keys()
@@ -66,6 +87,12 @@ class ParameterMap:
 
         return ParameterMapItemIterator(self)
 
+    def all_differentiable(self):
+        for k in self.keys():
+            if not is_differentiable(self[k]):
+                return False
+        return True
+
     def torch(self) -> dict:
         """
         Converts all Enoki arrays into PyTorch arrays and return them as a
@@ -82,9 +109,10 @@ class ParameterMap:
         internal state. For instance, the scene may rebuild the kd-tree
         when a shape was modified, etc.
         """
-        work_list = sorted(set(self.update_list), key=lambda x: x[0])
-        for depth, node in reversed(work_list):
-            node.parameters_changed()
+        work_list = [(d, n, k) for (d, n), k in self.update_list.items()]
+        work_list = reversed(sorted(work_list, key=lambda x: x[0]))
+        for depth, node, keys in work_list:
+            node.parameters_changed(keys)
         self.update_list.clear()
 
     def keep(self, keys: list) -> None:

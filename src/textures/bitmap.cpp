@@ -27,7 +27,8 @@ Bitmap texture (:monosp:`bitmap`)
      (e.g. sRGB to linear, spectral upsampling) be disabled? (Default: false)
  * - to_uv
    - |transform|
-   - Specifies an optional uv transformation.  (Default: none, i.e. emitter space = world space)
+   - Specifies an optional 3x3 UV transformation matrix. A 4x4 matrix can also be provided.
+     In that case, the last row and columns will be ignored.  (Default: none)
 
 This plugin provides a bitmap texture source that performs bilinearly interpolated
 lookups on JPEG, PNG, OpenEXR, RGBE, TGA, and BMP files.
@@ -193,16 +194,11 @@ public:
             hprod(m_resolution) * Channels);
     }
 
-    void traverse(TraversalCallback *callback) override {
-        callback->put_parameter("data", m_data);
-        callback->put_parameter("resolution", m_resolution);
-        callback->put_parameter("transform", m_transform);
-    }
-
     UnpolarizedSpectrum eval(const SurfaceInteraction3f &si, Mask active) const override {
         MTS_MASKED_FUNCTION(ProfilerPhase::TextureEvaluate, active);
 
         if constexpr (Channels == 3 && is_spectral_v<Spectrum> && Raw) {
+            ENOKI_MARK_USED(si);
             Throw("The bitmap texture %s was queried for a spectrum, but texture conversion "
                   "into spectra was explicitly disabled! (raw=true)",
                   to_string());
@@ -220,6 +216,7 @@ public:
         MTS_MASKED_FUNCTION(ProfilerPhase::TextureEvaluate, active);
 
         if constexpr (Channels == 3 && is_spectral_v<Spectrum> && !Raw) {
+            ENOKI_MARK_USED(si);
             Throw("eval_1(): The bitmap texture %s was queried for a scalar value, but texture "
                   "conversion into spectra was requested! (raw=false)",
                   to_string());
@@ -237,9 +234,11 @@ public:
         MTS_MASKED_FUNCTION(ProfilerPhase::TextureEvaluate, active);
 
         if constexpr (Channels != 3) {
+            ENOKI_MARK_USED(si);
             Throw("eval_3(): The bitmap texture %s was queried for a RGB value, but it is "
                   "monochromatic!", to_string());
         } else if constexpr (is_spectral_v<Spectrum> && !Raw) {
+            ENOKI_MARK_USED(si);
             Throw("eval_3(): The bitmap texture %s was queried for a RGB value, but texture "
                   "conversion into spectra was requested! (raw=false)",
                   to_string());
@@ -293,39 +292,47 @@ public:
         }
     }
 
-    void parameters_changed() override {
-        /// Convert m_data into a managed array (available in CPU/GPU address space)
-        if constexpr (is_cuda_array_v<Float>)
-            m_data = m_data.managed();
+    void traverse(TraversalCallback *callback) override {
+        callback->put_parameter("data", m_data);
+        callback->put_parameter("resolution", m_resolution);
+        callback->put_parameter("transform", m_transform);
+    }
 
-        // Recompute the mean texture value following an update
-        ScalarFloat *ptr = m_data.data();
+    void parameters_changed(const std::vector<std::string> &keys = {}) override {
+        if (keys.empty() || string::contains(keys, "data")) {
+            /// Convert m_data into a managed array (available in CPU/GPU address space)
+            if constexpr (is_cuda_array_v<Float>)
+                m_data = m_data.managed();
 
-        double mean = 0.0;
-        size_t pixel_count = hprod(m_resolution);
-        if (Channels == 3) {
-            if (is_spectral_v<Spectrum> && !Raw) {
-                for (size_t i = 0; i < pixel_count; ++i) {
-                    ScalarColor3f value = load_unaligned<ScalarColor3f>(ptr);
-                    mean += (double) srgb_model_mean(value);
-                    ptr += 3;
+            // Recompute the mean texture value following an update
+            ScalarFloat *ptr = m_data.data();
+
+            double mean = 0.0;
+            size_t pixel_count = hprod(m_resolution);
+            if (Channels == 3) {
+                if (is_spectral_v<Spectrum> && !Raw) {
+                    for (size_t i = 0; i < pixel_count; ++i) {
+                        ScalarColor3f value = load_unaligned<ScalarColor3f>(ptr);
+                        mean += (double) srgb_model_mean(value);
+                        ptr += 3;
+                    }
+                } else {
+                    for (size_t i = 0; i < pixel_count; ++i) {
+                        ScalarFloat value = ptr[i];
+                        value = clamp(value, 0.f, 1.f);
+                        ptr[i] = value;
+                        mean += (double) value;
+                    }
                 }
-            } else {
-                for (size_t i = 0; i < pixel_count; ++i) {
-                    ScalarColor3f value = load_unaligned<ScalarColor3f>(ptr);
-                    mean += (double) luminance(value);
-                    ptr += 3;
-                }
+
+                m_mean = ScalarFloat(mean / pixel_count);
             }
-        } else {
-            for (size_t i = 0; i < pixel_count; ++i)
-                mean += (double) ptr[i];
         }
-
-        m_mean = ScalarFloat(mean / pixel_count);
     }
 
     ScalarFloat mean() const override { return m_mean; }
+
+    bool is_spatially_varying() const override { return true; }
 
     std::string to_string() const override {
         std::ostringstream oss;
@@ -351,7 +358,7 @@ protected:
 MTS_IMPLEMENT_CLASS_VARIANT(BitmapTexture, Texture)
 MTS_EXPORT_PLUGIN(BitmapTexture, "Bitmap texture")
 
-NAMESPACE_BEGIN()
+NAMESPACE_BEGIN(detail)
 template <uint32_t Channels, bool Raw>
 constexpr const char * bitmap_class_name() {
     if constexpr (!Raw) {
@@ -366,11 +373,11 @@ constexpr const char * bitmap_class_name() {
             return "BitmapTextureImpl_3_1";
     }
 }
-NAMESPACE_END()
+NAMESPACE_END(detail)
 
 template <typename Float, typename Spectrum, uint32_t Channels, bool Raw>
 Class *BitmapTextureImpl<Float, Spectrum, Channels, Raw>::m_class
-    = new Class(bitmap_class_name<Channels, Raw>(), "Texture",
+    = new Class(detail::bitmap_class_name<Channels, Raw>(), "Texture",
                 ::mitsuba::detail::get_variant<Float, Spectrum>(), nullptr, nullptr);
 
 template <typename Float, typename Spectrum, uint32_t Channels, bool Raw>

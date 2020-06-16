@@ -85,6 +85,7 @@ public:
         ds.time  = it.time;
         ds.pdf   = 1.f;
         ds.delta = true;
+        ds.object = this;
         ds.d     = ds.p - it.p;
         ds.dist  = norm(ds.d);
         Float inv_dist = rcp(ds.dist);
@@ -114,9 +115,9 @@ public:
     std::string to_string() const override {
         std::ostringstream oss;
         oss << "PointLight[" << std::endl
-            << "  world_transform = " << string::indent(m_world_transform->to_string()) << "," << std::endl
+            << "  world_transform = " << string::indent(m_world_transform) << "," << std::endl
             << "  intensity = " << m_intensity << "," << std::endl
-            << "  medium = " << (m_medium ? string::indent(m_medium->to_string()) : "")
+            << "  medium = " << (m_medium ? string::indent(m_medium) : "")
             << "]";
         return oss.str();
     }

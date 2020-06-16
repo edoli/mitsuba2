@@ -54,8 +54,10 @@ public:
                   "shape.");
 
         m_radiance = props.texture<Texture>("radiance", Texture::D65(1.f));
-        // TODO: detect if underlying spectrum really is spatially varying
-        m_flags = EmitterFlags::Surface | EmitterFlags::SpatiallyVarying;
+
+        m_flags = +EmitterFlags::Surface;
+        if (m_radiance->is_spatially_varying())
+            m_flags |= +EmitterFlags::SpatiallyVarying;
     }
 
     void set_shape(Shape *shape) override {
@@ -128,6 +130,11 @@ public:
         callback->put_object("radiance", m_radiance.get());
     }
 
+    void parameters_changed(const std::vector<std::string> &keys) override {
+        if (string::contains(keys, "parent"))
+            m_area_times_pi = m_shape->surface_area() * math::Pi<ScalarFloat>;
+    }
+
     std::string to_string() const override {
         std::ostringstream oss;
         oss << "AreaLight[" << std::endl
@@ -136,7 +143,7 @@ public:
         if (m_shape) oss << m_shape->surface_area();
         else         oss << "  <no shape attached!>";
         oss << "," << std::endl;
-        if (m_medium) oss << string::indent(m_medium->to_string());
+        if (m_medium) oss << string::indent(m_medium);
         else         oss << "  <no medium attached!>";
         oss << std::endl << "]";
         return oss.str();

@@ -2,6 +2,7 @@ import enoki as ek
 import pytest
 import mitsuba
 
+from mitsuba.python.test.util import fresolver_append_path
 
 def test01_invalid_xml(variant_scalar_rgb):
     from mitsuba.core import xml
@@ -278,3 +279,22 @@ def test19_invalid_vector(variant_scalar_rgb):
                    <vector name="10" value="1, 2, 3" x="4"/>
                    </scene>""")
     e.match(err_str3)
+
+
+def test20_upgrade_tree(variant_scalar_rgb):
+    from mitsuba.core import xml
+
+    err_str = 'unreferenced property'
+    with pytest.raises(Exception) as e:
+        xml.load_string("""<scene version="2.0.0">
+                            <bsdf type="dielectric">
+                                <float name="intIOR" value="1.33"/>
+                            </bsdf>
+                        </scene>""")
+    e.match(err_str)
+
+    xml.load_string("""<scene version="0.1.0">
+                           <bsdf type="dielectric">
+                               <float name="intIOR" value="1.33"/>
+                           </bsdf>
+                       </scene>""")

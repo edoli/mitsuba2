@@ -56,6 +56,8 @@ Currently, the following AOVs types are available:
     - :monosp:`uv`: UV coordinates.
     - :monosp:`geo_normal`: Geometric normal.
     - :monosp:`sh_normal`: Shading normal.
+    - :monosp:`dp_du`, :monosp:`dp_dv`: Position partials wrt. the UV parameterization.
+    - :monosp:`duv_dx`, :monosp:`duv_dy`: UV partials wrt. changes in screen-space.
 
  */
 
@@ -63,7 +65,7 @@ template <typename Float, typename Spectrum>
 class AOVIntegrator final : public SamplingIntegrator<Float, Spectrum> {
 public:
     MTS_IMPORT_BASE(SamplingIntegrator)
-    MTS_IMPORT_TYPES(Scene, Sampler)
+    MTS_IMPORT_TYPES(Scene, Sampler, Medium)
 
     enum class Type {
         Depth,
@@ -71,6 +73,10 @@ public:
         UV,
         GeometricNormal,
         ShadingNormal,
+        dPdU,
+        dPdV,
+        dUVdx,
+        dUVdy,
         IntegratorRGBA
     };
 
@@ -105,6 +111,24 @@ public:
                 m_aov_names.push_back(item[0] + ".X");
                 m_aov_names.push_back(item[0] + ".Y");
                 m_aov_names.push_back(item[0] + ".Z");
+            } else if (item[1] == "dp_du") {
+                m_aov_types.push_back(Type::dPdU);
+                m_aov_names.push_back(item[0] + ".X");
+                m_aov_names.push_back(item[0] + ".Y");
+                m_aov_names.push_back(item[0] + ".Z");
+            } else if (item[1] == "dp_dv") {
+                m_aov_types.push_back(Type::dPdV);
+                m_aov_names.push_back(item[0] + ".X");
+                m_aov_names.push_back(item[0] + ".Y");
+                m_aov_names.push_back(item[0] + ".Z");
+            } else if (item[1] == "duv_dx") {
+                m_aov_types.push_back(Type::dUVdx);
+                m_aov_names.push_back(item[0] + ".U");
+                m_aov_names.push_back(item[0] + ".V");
+            } else if (item[1] == "duv_dy") {
+                m_aov_types.push_back(Type::dUVdy);
+                m_aov_names.push_back(item[0] + ".U");
+                m_aov_names.push_back(item[0] + ".V");
             } else {
                 Throw("Invalid AOV type \"%s\"!", item[1]);
             }
@@ -133,6 +157,7 @@ public:
                 const Scene *scene,
                 Sampler * sampler,
                 const RayDifferential3f &ray,
+                const Medium *medium,
                 Float *aovs,
                 Mask active) const override {
         MTS_MASKED_FUNCTION(ProfilerPhase::SamplingIntegratorSample, active);
@@ -140,8 +165,7 @@ public:
         std::pair<Spectrum, Mask> result { 0.f, false };
 
         SurfaceInteraction3f si = scene->ray_intersect(ray, active);
-        active = si.is_valid();
-        si[!active] = zero<SurfaceInteraction3f>();
+        si[!si.is_valid()] = zero<SurfaceInteraction3f>();
         size_t ctr = 0;
 
         for (size_t i = 0; i < m_aov_types.size(); ++i) {
@@ -172,6 +196,58 @@ public:
                     *aovs++ = si.sh_frame.n.y();
                     *aovs++ = si.sh_frame.n.z();
                     break;
+
+                case Type::dPdU:
+                    *aovs++ = si.dp_du.x();
+                    *aovs++ = si.dp_du.y();
+                    *aovs++ = si.dp_du.z();
+                    break;
+
+                case Type::dPdV:
+                    *aovs++ = si.dp_dv.x();
+                    *aovs++ = si.dp_dv.y();
+                    *aovs++ = si.dp_dv.z();
+                    break;
+
+                case Type::dUVdx:
+                    *aovs++ = si.duv_dx.x();
+                    *aovs++ = si.duv_dx.y();
+                    break;
+
+                case Type::dUVdy:
+                    *aovs++ = si.duv_dy.x();
+                    *aovs++ = si.duv_dy.y();
+                    break;
+
+                case Type::IntegratorRGBA: {
+                        std::pair<Spectrum, Mask> result_sub =
+                            m_integrators[ctr].first->sample(scene, sampler, ray, medium, aovs, active);
+                        aovs += m_integrators[ctr].second;
+
+                        UnpolarizedSpectrum spec_u = depolarize(result_sub.first);
+
+                        Color3f rgb;
+                        if constexpr (is_monochromatic_v<Spectrum>) {
+                            rgb = spec_u.x();
+                        } else if constexpr (is_rgb_v<Spectrum>) {
+                            rgb = spec_u;
+                        } else {
+                            static_assert(is_spectral_v<Spectrum>);
+                            /// Note: this assumes that sensor used sample_rgb_spectrum() to generate 'ray.wavelengths'
+                            auto pdf = pdf_rgb_spectrum(ray.wavelengths);
+                            spec_u *= select(neq(pdf, 0.f), rcp(pdf), 0.f);
+                            rgb = xyz_to_srgb(spectrum_to_xyz(spec_u, ray.wavelengths, active));
+                        }
+
+                        *aovs++ = rgb.r(); *aovs++ = rgb.g(); *aovs++ = rgb.b();
+                        *aovs++ = select(result_sub.second, Float(1.f), Float(0.f));
+
+                        if (ctr == 0)
+                            result = result_sub;
+
+                        ctr++;
+                    }
+                    break;
             }
         }
 
@@ -193,7 +269,7 @@ public:
             << "  aovs = " << m_aov_names << "," << std::endl
             << "  integrators = [" << std::endl;
         for (size_t i = 0; i < m_integrators.size(); ++i) {
-            oss << "    " << string::indent(m_integrators[i].first->to_string(), 4);
+            oss << "    " << string::indent(m_integrators[i].first, 4);
             if (i + 1 < m_integrators.size())
                 oss << ",";
             oss << std::endl;

@@ -58,7 +58,7 @@ template <typename Float, typename Spectrum>
 class StokesIntegrator final : public SamplingIntegrator<Float, Spectrum> {
 public:
     MTS_IMPORT_BASE(SamplingIntegrator)
-    MTS_IMPORT_TYPES(Scene, Sampler)
+    MTS_IMPORT_TYPES(Scene, Sampler, Medium)
 
     StokesIntegrator(const Properties &props) : Base(props) {
         if constexpr (!is_polarized_v<Spectrum>)
@@ -80,11 +80,12 @@ public:
                 const Scene *scene,
                 Sampler * sampler,
                 const RayDifferential3f &ray,
+                const Medium *medium,
                 Float *aovs,
                 Mask active) const override {
         MTS_MASKED_FUNCTION(ProfilerPhase::SamplingIntegratorSample, active);
 
-        m_integrator->sample(samples, scene, sampler, ray, aovs + 12, active);
+        m_integrator->sample(samples, scene, sampler, ray, medium, aovs + 12, active);
         auto result = (*samples)[0].first;
 
         if constexpr (is_polarized_v<Spectrum>) {

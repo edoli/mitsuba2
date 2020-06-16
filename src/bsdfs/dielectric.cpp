@@ -80,8 +80,9 @@ An example of how one might describe a slightly absorbing piece of glass is show
         </bsdf>
 
         <medium type="homogeneous" name="interior">
-            <rgb name="sigma_s" value="0, 0, 0"/>
-            <rgb name="sigma_a" value="4, 4, 2"/>
+            <float name="density" value="4"/>
+	    <rgb name="sigma_t" value="1, 1, 0.5"/>
+	    <rgb name="albedo" value="0.0, 0.0, 0.0"/>
         </medium>
     <shape>
 
@@ -184,8 +185,10 @@ public:
 
         m_eta = int_ior / ext_ior;
 
-        m_specular_reflectance   = props.texture<Texture>("specular_reflectance", 1.f);
-        m_specular_transmittance = props.texture<Texture>("specular_transmittance", 1.f);
+        if (props.has_property("specular_reflectance"))
+            m_specular_reflectance   = props.texture<Texture>("specular_reflectance", 1.f);
+        if (props.has_property("specular_transmittance"))
+            m_specular_transmittance = props.texture<Texture>("specular_transmittance", 1.f);
 
         m_components.push_back(BSDFFlags::DeltaReflection | BSDFFlags::FrontSide |
                                BSDFFlags::BackSide);
@@ -237,8 +240,11 @@ public:
 
         bs.eta = select(selected_r, Float(1.f), eta_it);
 
-        UnpolarizedSpectrum reflectance = m_specular_reflectance->eval(si, selected_r);
-        UnpolarizedSpectrum transmittance = m_specular_transmittance->eval(si, selected_t);
+        UnpolarizedSpectrum reflectance = 1.f, transmittance = 1.f;
+        if (m_specular_reflectance)
+            reflectance = m_specular_reflectance->eval(si, selected_r);
+        if (m_specular_transmittance)
+            transmittance = m_specular_transmittance->eval(si, selected_t);
 
         Spectrum weight;
         if constexpr (is_polarized_v<Spectrum>) {
@@ -309,28 +315,32 @@ public:
         return { bs, select(active, weight, 0.f) };
     }
 
-    Spectrum eval(const BSDFContext & /*ctx*/, const SurfaceInteraction3f & /*si*/,
-                  const Vector3f & /*wo*/, Mask /*active*/) const override {
+    Spectrum eval(const BSDFContext & /* ctx */, const SurfaceInteraction3f & /* si */,
+                  const Vector3f & /* wo */, Mask /* active */) const override {
         return 0.f;
     }
 
-    Float pdf(const BSDFContext & /*ctx*/, const SurfaceInteraction3f & /*si*/,
-              const Vector3f & /*wo*/, Mask /*active*/) const override {
+    Float pdf(const BSDFContext & /* ctx */, const SurfaceInteraction3f & /* si */,
+              const Vector3f & /* wo */, Mask /* active */) const override {
         return 0.f;
     }
 
     void traverse(TraversalCallback *callback) override {
         callback->put_parameter("eta", m_eta);
-        callback->put_object("specular_reflectance", m_specular_reflectance.get());
-        callback->put_object("specular_transmittance", m_specular_transmittance.get());
+        if (m_specular_reflectance)
+            callback->put_object("specular_reflectance", m_specular_reflectance.get());
+        if (m_specular_transmittance)
+            callback->put_object("specular_transmittance", m_specular_transmittance.get());
     }
 
     std::string to_string() const override {
         std::ostringstream oss;
-        oss << "SmoothDielectric[" << std::endl
-            << "  eta = " << m_eta << "," << std::endl
-            << "  specular_reflectance = " << string::indent(m_specular_reflectance) << "," << std::endl
-            << "  specular_transmittance = " << string::indent(m_specular_transmittance) << std::endl
+        oss << "SmoothDielectric[" << std::endl;
+        if (m_specular_reflectance)
+            oss << "  specular_reflectance = " << string::indent(m_specular_reflectance) << "," << std::endl;
+        if (m_specular_transmittance)
+            oss << "  specular_transmittance = " << string::indent(m_specular_transmittance) << ", " << std::endl;
+        oss << "  eta = " << m_eta << "," << std::endl
             << "]";
         return oss.str();
     }

@@ -611,7 +611,7 @@ sample_1d(Float min, Float max, const Float *values, const Float *cdf,
 
     GET_SPLINE_UNIFORM(idx);
 
-    // Re-scale the sample after having choosen the interval
+    // Re-scale the sample after having chosen the interval
     sample = (sample - gather<Value>(cdf, idx)) * inv_width;
 
     /* Importance sample linear interpolant as initial guess for 't'*/
@@ -706,7 +706,7 @@ sample_1d(const Float *nodes, const Float *values, const Float *cdf,
 
     GET_SPLINE_NONUNIFORM(idx);
 
-    // Re-scale the sample after having choosen the interval
+    // Re-scale the sample after having chosen the interval
     sample = (sample - gather<Value>(cdf, idx)) / width;
 
     /* Importance sample linear interpolant as initial guess for 't'*/
@@ -1015,7 +1015,7 @@ Value eval_2d(const Float *nodes1, uint32_t size1, const Float *nodes2,
             index += 1;
         }
 
-        index += size1 - 4;
+        index += (int32_t) size1 - 4;
     }
 
     return result;

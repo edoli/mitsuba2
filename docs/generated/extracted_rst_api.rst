@@ -280,6 +280,22 @@
         Parameter ``format`` (:py:obj:`mitsuba.core.Bitmap.FileFormat`):
             *no description available*
 
+    .. py:class:: mitsuba.core.Bitmap.AlphaTransform
+
+        Members:
+
+            None : No transformation (default)
+
+            Premultiply : No transformation (default)
+
+            Unpremultiply : No transformation (default)
+
+        .. py:method:: __init__(self, arg0)
+
+            Parameter ``arg0`` (int):
+                *no description available*
+
+
     .. py:class:: mitsuba.core.Bitmap.FileFormat
 
         Supported image file formats
@@ -536,7 +552,7 @@
     .. py:method:: mitsuba.core.Bitmap.convert(overloaded)
 
 
-        .. py:method:: convert(self, pixel_format, component_format, srgb_gamma)
+        .. py:method:: convert(self, pixel_format, component_format, srgb_gamma, alpha_transform=AlphaTransform.None)
 
             Convert the bitmap into another pixel and/or component format
 
@@ -589,6 +605,9 @@
             Parameter ``srgb_gamma`` (bool):
                 *no description available*
 
+            Parameter ``alpha_transform`` (:py:obj:`mitsuba.core.Bitmap.AlphaTransform`):
+                *no description available*
+
             Returns → :py:obj:`mitsuba.core.Bitmap`:
                 *no description available*
 
@@ -625,7 +644,7 @@
 
         Return a Properties object containing the image metadata
 
-        Returns → :py:obj:`mitsuba.core.Properties`:
+        Returns → mitsuba::Properties:
             *no description available*
 
     .. py:method:: mitsuba.core.Bitmap.pixel_count(self)
@@ -640,6 +659,13 @@
         Return the pixel format of this bitmap
 
         Returns → :py:obj:`mitsuba.core.Bitmap.PixelFormat`:
+            *no description available*
+
+    .. py:method:: mitsuba.core.Bitmap.premultiplied_alpha(self)
+
+        Return whether the bitmap uses premultiplied alpha
+
+        Returns → bool:
             *no description available*
 
     .. py:method:: mitsuba.core.Bitmap.resample(overloaded)
@@ -716,6 +742,16 @@
 
             Returns → :py:obj:`mitsuba.core.Bitmap`:
                 *no description available*
+
+    .. py:method:: mitsuba.core.Bitmap.set_premultiplied_alpha(self, arg0)
+
+        Specify whether the bitmap uses premultiplied alpha
+
+        Parameter ``arg0`` (bool):
+            *no description available*
+
+        Returns → None:
+            *no description available*
 
     .. py:method:: mitsuba.core.Bitmap.set_srgb_gamma(self, arg0)
 
@@ -837,7 +873,8 @@
 
     .. py:method:: mitsuba.core.Bitmap.write_async(self, path, format=FileFormat.Auto, quality=-1)
 
-        Equivalent to \ref write(), but executes asynchronously on a different thread
+        Equivalent to write(), but executes asynchronously on a different
+        thread
 
         Parameter ``path`` (:py:obj:`mitsuba.core.filesystem.path`):
             *no description available*
@@ -1555,6 +1592,35 @@
     See also:
         ref, Object
 
+    .. py:method:: mitsuba.core.Class.alias(self)
+
+        Return the scene description-specific alias, if applicable
+
+        Returns → str:
+            *no description available*
+
+    .. py:method:: mitsuba.core.Class.name(self)
+
+        Return the name of the class
+
+        Returns → str:
+            *no description available*
+
+    .. py:method:: mitsuba.core.Class.parent(self)
+
+        Return the Class object associated with the parent class of nullptr if
+        it does not have one.
+
+        Returns → :py:obj:`mitsuba.core.Class`:
+            *no description available*
+
+    .. py:method:: mitsuba.core.Class.variant(self)
+
+        Return the variant of the class
+
+        Returns → str:
+            *no description available*
+
 .. py:class:: mitsuba.core.ContinuousDistribution
 
     Continuous 1D probability distribution defined in terms of a regularly
@@ -1746,7 +1812,7 @@
 
 .. py:data:: mitsuba.core.DEBUG
     :type: bool
-    :value: True
+    :value: False
 
 .. py:class:: mitsuba.core.DefaultFormatter
 
@@ -3319,7 +3385,7 @@
 
 .. py:data:: mitsuba.core.MTS_ENABLE_OPTIX
     :type: bool
-    :value: True
+    :value: False
 
 .. py:data:: mitsuba.core.MTS_FILTER_RESOLUTION
     :type: int
@@ -3327,7 +3393,7 @@
 
 .. py:data:: mitsuba.core.MTS_VERSION
     :type: str
-    :value: 2.0.0
+    :value: 2.1.0
 
 .. py:data:: mitsuba.core.MTS_VERSION_MAJOR
     :type: int
@@ -3335,7 +3401,7 @@
 
 .. py:data:: mitsuba.core.MTS_VERSION_MINOR
     :type: int
-    :value: 0
+    :value: 1
 
 .. py:data:: mitsuba.core.MTS_VERSION_PATCH
     :type: int
@@ -3343,7 +3409,7 @@
 
 .. py:data:: mitsuba.core.MTS_YEAR
     :type: str
-    :value: 2019
+    :value: 2020
 
 .. py:class:: mitsuba.core.MarginalContinuous2D0
 
@@ -4863,7 +4929,7 @@
         Returns → None:
             *no description available*
 
-    .. py:method:: mitsuba.core.Object.parameters_changed(self)
+    .. py:method:: mitsuba.core.Object.parameters_changed(self, keys=[])
 
         Update internal state after applying changes to parameters
 
@@ -4871,6 +4937,13 @@
         traverse) are modified in some way. The obect can then update its
         internal state so that derived quantities are consistent with the
         change.
+
+        Parameter ``keys`` (List[str]):
+            Optional list of names (obtained via traverse) corresponding to
+            the attributes that have been modified. Can also be used to notify
+            when this function is called from a parent object by adding a
+            "parent" key to the list. When empty, the object should assume
+            that any attribute might have changed.
 
         Remark:
             The default implementation does nothing.
@@ -5060,6 +5133,37 @@
             *no description available*
 
         Returns → None:
+            *no description available*
+
+.. py:class:: mitsuba.core.PluginManager
+
+    The object factory is responsible for loading plugin modules and
+    instantiating object instances.
+
+    Ordinarily, this class will be used by making repeated calls to the
+    create_object() methods. The generated instances are then assembled
+    into a final object graph, such as a scene. One such examples is the
+    SceneHandler class, which parses an XML scene file by essentially
+    translating the XML elements into calls to create_object().
+
+    .. py:method:: mitsuba.core.PluginManager.get_plugin_class(self, name, variant)
+
+        Return the class corresponding to a plugin for a specific variant
+
+        Parameter ``name`` (str):
+            *no description available*
+
+        Parameter ``variant`` (str):
+            *no description available*
+
+        Returns → :py:obj:`mitsuba.core.Class`:
+            *no description available*
+
+    .. py:method:: mitsuba.core.PluginManager.instance()
+
+        Return the global plugin manager
+
+        Returns → :py:obj:`mitsuba.core.PluginManager`:
             *no description available*
 
 .. py:class:: mitsuba.core.Properties
@@ -6331,6 +6435,14 @@
             In FieldConverter::convert, check that the field value matches the
             specified default value. Otherwise, return a failure
 
+        .. py:data:: Alpha
+
+            Specifies whether the field encodes an alpha value
+
+        .. py:data:: PremultipliedAlpha
+
+            Specifies whether the field encodes an alpha premultiplied value
+
         .. py:data:: Default
 
             In FieldConverter::convert, when the field is missing in the source
@@ -6732,6 +6844,17 @@
         Return the thread priority
 
         Returns → :py:obj:`mitsuba.core.Thread.EPriority`:
+            *no description available*
+
+    .. py:method:: mitsuba.core.Thread.register_external_thread(arg0)
+
+        Register a new thread (e.g. TBB, Python) with Mituba thread system.
+        Returns true upon success.
+
+        Parameter ``arg0`` (str):
+            *no description available*
+
+        Returns → bool:
             *no description available*
 
     .. py:method:: mitsuba.core.Thread.set_core_affinity(self, arg0)
@@ -10526,14 +10649,24 @@
     Returns → enoki.scalar.Vector2f:
         *no description available*
 
-.. py:function:: mitsuba.core.xml.load_file(path, parameters=[], update_scene=False)
+.. py:function:: mitsuba.core.xml.load_dict(dict)
+
+    Load a Mitsuba scene or object from an Python dictionary
+
+    Parameter ``dict`` (dict):
+        Python dictionary containing the object description
+
+    Returns → object:
+        *no description available*
+
+.. py:function:: mitsuba.core.xml.load_file(path, update_scene=False, **kwargs)
 
     Load a Mitsuba scene from an XML file
 
     Parameter ``path`` (str):
         Filename of the scene XML file
 
-    Parameter ``parameters`` (List[Tuple[str, str]]):
+    Parameter ``parameters``:
         Optional list of parameters that can be referenced as ``$varname``
         in the scene.
 
@@ -10548,14 +10681,11 @@
     Returns → object:
         *no description available*
 
-.. py:function:: mitsuba.core.xml.load_string(string, parameters=[])
+.. py:function:: mitsuba.core.xml.load_string(string)
 
     Load a Mitsuba scene from an XML string
 
-    Parameter ``string`` (str):
-        *no description available*
-
-    Parameter ``parameters`` (List[Tuple[str, str]]):
+    Parameter ``string`` (str, **kwargs):
         *no description available*
 
     Returns → object:
@@ -10603,7 +10733,7 @@
         :py:obj:`mitsuba.render.BSDFContext`
 
     See also:
-        :py:obj:`mitsuba.render.BSDFSample3`
+        :py:obj:`mitsuba.render.BSDFSample3f`
 
     .. py:method:: __init__(self, props)
 
@@ -11498,7 +11628,8 @@
 
     .. py:method:: mitsuba.render.Film.put(self, block)
 
-        Merge an image block into the film
+        Merge an image block into the film. This methods should be thread-
+        safe.
 
         Parameter ``block`` (:py:obj:`mitsuba.render.ImageBlock`):
             *no description available*
@@ -11983,28 +12114,54 @@
 
     Base class: :py:obj:`mitsuba.render.Shape`
 
+    __init__(self: :py:obj:`mitsuba.render.Mesh`, name: str, vertex_count: int, face_count: int, props: :py:obj:`mitsuba.core.Properties` = Properties[
+      plugin_name = "",
+      id = "",
+      elements = {
+      }
+    ]
+    , has_vertex_normals: bool = False, has_vertex_texcoords: bool = False) -> None
+
     Create a new mesh with the given vertex and face data structures
 
-    .. py:method:: mitsuba.render.Mesh.face_struct(self)
+    .. py:method:: mitsuba.render.Mesh.add_attribute(self, name, size, buffer)
 
-        Return a ``Struct`` instance describing the contents of the face
-        buffer
+        Add an attribute buffer with the given ``name`` and ``dim``
 
-        Returns → :py:obj:`mitsuba.core.Struct`:
+        Parameter ``name`` (str):
             *no description available*
 
-    .. py:method:: mitsuba.render.Mesh.faces(self)
-
-        Const variant of faces.
-
-        Returns → array:
+        Parameter ``size`` (int):
             *no description available*
 
-    .. py:method:: mitsuba.render.Mesh.has_vertex_colors(self)
+        Parameter ``buffer`` (enoki.dynamic.Float32):
+            *no description available*
 
-        Does this mesh have per-vertex texture colors?
+        Returns → None:
+            *no description available*
 
-        Returns → bool:
+    .. py:method:: mitsuba.render.Mesh.attribute_buffer(self, name)
+
+        Return the mesh attribute associated with ``name``
+
+        Parameter ``name`` (str):
+            *no description available*
+
+        Returns → enoki.dynamic.Float32:
+            *no description available*
+
+    .. py:method:: mitsuba.render.Mesh.face_count(self)
+
+        Return the total number of faces
+
+        Returns → int:
+            *no description available*
+
+    .. py:method:: mitsuba.render.Mesh.faces_buffer(self)
+
+        Return face indices buffer
+
+        Returns → enoki.dynamic.UInt32:
             *no description available*
 
     .. py:method:: mitsuba.render.Mesh.has_vertex_normals(self)
@@ -12058,26 +12215,39 @@
         Returns → None:
             *no description available*
 
-    .. py:method:: mitsuba.render.Mesh.vertex_struct(self)
+    .. py:method:: mitsuba.render.Mesh.vertex_count(self)
 
-        Return a ``Struct`` instance describing the contents of the vertex
-        buffer
+        Return the total number of vertices
 
-        Returns → :py:obj:`mitsuba.core.Struct`:
+        Returns → int:
             *no description available*
 
-    .. py:method:: mitsuba.render.Mesh.vertices(self)
+    .. py:method:: mitsuba.render.Mesh.vertex_normals_buffer(self)
 
-        Return a pointer to the raw vertex buffer
+        Return vertex normals buffer
 
-        Returns → array:
+        Returns → enoki.dynamic.Float32:
             *no description available*
 
-    .. py:method:: mitsuba.render.Mesh.write(self, arg0)
+    .. py:method:: mitsuba.render.Mesh.vertex_positions_buffer(self)
 
-        Export mesh using the file format implemented by the subclass
+        Return vertex positions buffer
 
-        Parameter ``arg0`` (:py:obj:`mitsuba.core.Stream`):
+        Returns → enoki.dynamic.Float32:
+            *no description available*
+
+    .. py:method:: mitsuba.render.Mesh.vertex_texcoords_buffer(self)
+
+        Return vertex texcoords buffer
+
+        Returns → enoki.dynamic.Float32:
+            *no description available*
+
+    .. py:method:: mitsuba.render.Mesh.write_ply(self, filename)
+
+        Export mesh as a binary PLY file
+
+        Parameter ``filename`` (str):
             *no description available*
 
         Returns → None:
@@ -12641,7 +12811,7 @@
 
     .. py:method:: mitsuba.render.Sampler.wavefront_size(self)
 
-        Return the size of the wavefront, or 0 if not seeded.
+        Return the size of the wavefront (or 0, if not seeded)
 
         Returns → int:
             *no description available*
@@ -12672,7 +12842,7 @@
         Returns → List[str]:
             *no description available*
 
-    .. py:method:: mitsuba.render.SamplingIntegrator.sample(self, scene, sampler, ray, active=True)
+    .. py:method:: mitsuba.render.SamplingIntegrator.sample(self, scene, sampler, ray, medium=None, active=True)
 
         Sample the incident radiance along a ray.
 
@@ -12685,6 +12855,10 @@
 
         Parameter ``ray`` (:py:obj:`mitsuba.core.RayDifferential3f`):
             A ray, optionally with differentials
+
+        Parameter ``medium`` (:py:obj:`mitsuba.render.Medium`):
+            If the ray is inside a medium, this parameter holds a pointer to
+            that medium
 
         Parameter ``active`` (bool):
             A mask that indicates which SIMD lanes are active
@@ -12707,7 +12881,8 @@
         Remark:
             In the Python bindings, this function returns the ``aov`` output
             argument as an additional return value. In other words: `` (spec,
-            mask, aov) = integrator.sample(scene, sampler, ray, active) ``
+            mask, aov) = integrator.sample(scene, sampler, ray, medium,
+            active) ``
 
     .. py:method:: mitsuba.render.SamplingIntegrator.should_stop(self)
 
@@ -12829,9 +13004,7 @@
 
     .. py:method:: mitsuba.render.Scene.shapes(self)
 
-        Return the list of shapes
-
-        Returns → List[:py:obj:`mitsuba.render.Shape`]:
+        Returns → list:
             *no description available*
 
 .. py:class:: mitsuba.render.Sensor
@@ -12964,6 +13137,11 @@
 
             Returns → :py:obj:`mitsuba.core.BoundingBox3f`:
                 *no description available*
+
+    .. py:method:: mitsuba.render.Shape.bsdf(self)
+
+        Returns → :py:obj:`mitsuba.render.BSDF`:
+            *no description available*
 
     .. py:method:: mitsuba.render.Shape.effective_primitive_count(self)
 
@@ -13319,11 +13497,11 @@
 
     .. py:method:: mitsuba.render.Spiral.next_block(self)
 
-        Return the offset and size of the next block.
+        Return the offset, size and unique identifer of the next block.
 
         A size of zero indicates that the spiral traversal is done.
 
-        Returns → Tuple[enoki.scalar.Vector2i, enoki.scalar.Vector2i]:
+        Returns → Tuple[enoki.scalar.Vector2i, enoki.scalar.Vector2i, int]:
             *no description available*
 
     .. py:method:: mitsuba.render.Spiral.reset(self)
@@ -13688,6 +13866,13 @@
 
         Returns → enoki.scalar.Vector3f:
             An trichromatic intensity or reflectance value
+
+    .. py:method:: mitsuba.render.Texture.is_spatially_varying(self)
+
+        Does this texture evaluation depend on the UV coordinates
+
+        Returns → bool:
+            *no description available*
 
     .. py:method:: mitsuba.render.Texture.mean(self)
 
@@ -14651,7 +14836,7 @@
        sufficient statistical evidence to reject this hypothesis.
 
     Parameter ``sample_dim`` (int):
-       Numer of random dimensions consumed by ``sample_func`` per sample. The
+       Number of random dimensions consumed by ``sample_func`` per sample. The
        default value is ``2``.
 
     Parameter ``sample_count`` (int):
@@ -14760,32 +14945,48 @@
 
     Maps between the unit sphere and a [cos(theta), phi] parameterization.
 
-.. py:function:: mitsuba.python.util.traverse(node)
+.. py:class:: mitsuba.python.util.ParameterMap(properties, hierarchy)
+
+    Dictionary-like object that references various parameters used in a Mitsuba
+    scene graph. Parameters can be read and written using standard syntax
+    (``parameter_map[key]``). The class exposes several non-standard functions,
+    specifically :py:meth:`~:py:obj:`mitsuba.python.util.ParameterMap.torch`()`,
+    :py:meth:`~:py:obj:`mitsuba.python.util.ParameterMap.update`()`, and
+    :py:meth:`~:py:obj:`mitsuba.python.util.ParameterMap.keep`()`.
+
+    .. py:method:: __init__(properties, hierarchy)
+
+        Private constructor (use
+        :py:func:`mitsuba.python.util.traverse()` instead)
+
+        
+    .. py:method:: mitsuba.python.util.ParameterMap.torch() -> dict
+
+        Converts all Enoki arrays into PyTorch arrays and return them as a
+        dictionary. This is mainly useful when using PyTorch to optimize a
+        Mitsuba scene.
+
+    .. py:method:: mitsuba.python.util.ParameterMap.update() -> None
+
+        This function should be called at the end of a sequence of writes
+        to the dictionary. It automatically notifies all modified Mitsuba
+        objects and their parent objects that they should refresh their
+        internal state. For instance, the scene may rebuild the kd-tree
+        when a shape was modified, etc.
+
+    .. py:method:: mitsuba.python.util.ParameterMap.keep(keys: list) -> None
+
+        Reduce the size of the dictionary by only keeping elements,
+        whose keys are part of the provided list 'keys'.
+
+.. py:function:: mitsuba.python.util.is_differentiable(p)
+
+.. py:function:: mitsuba.python.util.traverse(node: mitsuba.core.Object) -> mitsuba.python.util.ParameterMap
 
     Traverse a node of Mitsuba's scene graph and return a dictionary-like
     object that can be used to read and write associated scene parameters.
 
-    This dictionary exposes multiple non-standard methods:
-
-    1. ``keep(self, keys: list) -> None``:
-
-       Reduce the size of the dictionary by only keeping elements,
-       whose keys are part of the provided list 'keys'.
-
-    2. ``update(self) -> None``:
-
-       This function should be called at the end of a sequence of writes
-       to the dictionary. It automatically notifies all modified Mitsuba
-       objects and their parent objects that they should refresh their
-       internal state. For instance, the scene may rebuild the kd-tree
-       when a shape was modified, etc.
-
-    3. ``torch(self) -> dict``:
-
-       Converts all Enoki arrays into PyTorch arrays and return them as a
-       dictionary. This is mainly useful when using PyTorch to optimize a
-       Mitsuba scene.
-
+    See also :py:class:`mitsuba.python.util.ParameterMap`.
 
 .. py:function:: mitsuba.python.math.rlgamma(a, x)
 
@@ -14795,11 +14996,8 @@
 
     Base class: :py:obj:`mitsuba.python.autodiff.Optimizer`
 
-    Implements the optimization technique presented in
-
-    "Adam: A Method for Stochastic Optimization"
-    Diederik P. Kingma and Jimmy Lei Ba
-    ICLR 2015
+    Implements the Adam optimizer presented in the paper *Adam: A Method for
+    Stochastic Optimization* by Kingman and Ba, ICLR 2015.
 
     .. py:method:: __init__(params, lr, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
 
@@ -14815,6 +15013,10 @@
             order gradient moments
 
         
+    .. py:method:: mitsuba.python.autodiff.Adam.step()
+
+        Take a gradient step 
+
 .. py:class:: mitsuba.python.autodiff.Optimizer(params, lr)
 
     Base class of all gradient-based optimizers (currently SGD and Adam)
@@ -14842,7 +15044,21 @@
     Base class: :py:obj:`mitsuba.python.autodiff.Optimizer`
 
     Implements basic stochastic gradient descent with a fixed learning rate
-    and, optionally, momentum (0.9 is a typical parameter value).
+    and, optionally, momentum :cite:`Sutskever2013Importance` (0.9 is a typical
+    parameter value for the ``momentum`` parameter).
+
+    The momentum-based SGD uses the update equation
+
+    .. math::
+
+        v_{i+1} = \mu \cdot v_i +  g_{i+1}
+
+    .. math::
+        p_{i+1} = p_i + \varepsilon \cdot v_{i+1},
+
+    where :math:`v` is the velocity, :math:`p` are the positions,
+    :math:`\varepsilon` is the learning rate, and :math:`\mu` is
+    the momentum parameter.
 
     .. py:method:: __init__(params, lr, momentum=0)
 
@@ -14857,34 +15073,307 @@
 
         Take a gradient step 
 
-.. py:function:: mitsuba.python.autodiff.render(scene, spp=None, sensor_index=0)
+.. py:function:: mitsuba.python.autodiff._render_helper(scene, spp=None, sensor_index=0)
 
-    Render the specified Mitsuba scene and return a floating point
-    array containing RGB values and AOVs, if applicable
+    Internally used function: render the specified Mitsuba scene and return a
+    floating point array containing RGB values and AOVs, if applicable
 
-.. py:function:: mitsuba.python.autodiff.render_diff(scene, optimizer, unbiased=True, spp=None, spp_primal=None, spp_diff=None, sensor_index=0)
+.. py:function:: mitsuba.python.autodiff.render(scene, spp: Union[None, int, Tuple[int, int]] = None, unbiased=False, optimizer: mitsuba.python.autodiff.Optimizer = None, sensor_index=0)
 
-    Perform a differentiable of the scene `scene`.
+    Perform a differentiable of the scene `scene`, returning a floating point
+    array containing RGB values and AOVs, if applicable.
 
-    This function differs from ``render()`` in that it splits the rendering
-    step into two separate passes that generate the primal image and gradients,
-    respectively (assuming that ``unbiased=True`` is specified). This is
-    necessary to avoid correlations that would otherwise introduce bias into
-    the resulting parameter gradients.
+    Parameter ``spp`` (``None``, ``int``, or a 2-tuple ``(int, int)``):
+       Specifies the number of samples per pixel to be used for rendering,
+       overriding the value that is specified in the scene. If ``spp=None``,
+       the original value takes precedence. If ``spp`` is a 2-tuple
+       ``(spp_primal: int, spp_deriv: int)``, the first element specifies the
+       number of samples for the *primal* pass, and the second specifies the
+       number of samples for the *derivative* pass. See the explanation of the
+       ``unbiased`` parameter for further detail on what these mean.
 
-    The number of samples per pixel can be specified separately for both primal
-    and derivative passes.
+       Memory usage is roughly proportional to the ``spp``, value, hence this
+       parameter should be reduced if you encounter out-of-memory errors.
 
-    The number of samples per pixel per pass can be specified separately for
-    both primal (``spp_primal``) and derivative (``spp_diff``) passes or
-    jointly for both (``spp``).
+    Parameter ``unbiased`` (``bool``):
+        One potential issue when naively differentiating a rendering algorithm
+        is that the same set of Monte Carlo sample is used to generate both the
+        primal output (i.e. the image) along with derivative output. When the
+        rendering algorithm and objective are jointly differentiated, we end up
+        with expectations of products that do *not* satisfy the equality
+        :math:`\mathbb{E}[X Y]=\mathbb{E}[X]\, \mathbb{E}[Y]` due to
+        correlations between :math:`X` and :math:`Y` that result from this
+        sample re-use.
+
+        When ``unbiased=True``, the ``render()`` function will generate an
+        *unbiased* estimate that de-correlates primal and derivative
+        components, which boils down to rendering the image twice and naturally
+        comes at some cost in performance :math:`(\sim 1.6      imes\!)`. Often,
+        biased gradients are good enough, in which case ``unbiased=False``
+        should be specified instead.
+
+        The number of samples per pixel per pass can be specified separately
+        for both passes by passing a tuple to the ``spp`` parameter.
+
+        Note that unbiased mode is only relevant for reverse-mode
+        differentiation. It is not needed when visualizing parameter gradients
+        in image space using forward-mode differentiation.
+
+    Parameter ``optimizer`` (:py:class:`mitsuba.python.autodiff.Optimizer`):
+        The optimizer referencing relevant scene parameters must be specified
+        when ``unbiased=True``. Otherwise, there is no need to provide this
+        parameter.
+
+    Parameter ``sensor_index`` (``int``):
+        When the scene contains more than one sensor/camera, this parameter
+        can be specified to select the desired sensor.
 
 .. py:function:: mitsuba.python.autodiff.render_torch(scene, params=None, **kwargs)
 
-.. py:function:: mitsuba.python.autodiff.write_bitmap(filename, data, resolution)
+.. py:function:: mitsuba.python.autodiff.write_bitmap(filename, data, resolution, write_async=True)
 
-    Write the linearized RGB image in `data` to a
-    PNG/EXR/.. file with resolution `resolution`.
+    Write the linearized RGB image in `data` to a PNG/EXR/.. file with
+    resolution `resolution`.
+
+.. py:class:: mitsuba.python.xml.Files
+
+    Enum for different files or dicts containing specific info
+
+.. py:class:: mitsuba.python.xml.WriteXML(path, split_files=False)
+
+    File Writing API
+    Populates a dictionary with scene data, then writes it to XML.
+
+    .. py:method:: mitsuba.python.xml.WriteXML.data_add(key, value, file=0)
+
+        Add an entry to a given subdict.
+
+        Params
+        ------
+
+        key: dict key
+        value: entry
+        file: the subdict to which to add the data
+
+    .. py:method:: mitsuba.python.xml.WriteXML.add_comment(comment, file=0)
+
+        Add a comment to the scene dict
+
+        Params
+        ------
+
+        comment: text of the comment
+        file: the subdict to which to add the comment
+
+    .. py:method:: mitsuba.python.xml.WriteXML.add_include(file)
+
+        Add an include tag to the main file.
+        This is used when splitting the XML scene file in multiple fragments.
+
+        Params
+        ------
+
+        file: the file to include
+
+    .. py:method:: mitsuba.python.xml.WriteXML.wf(ind, st, tabs=0)
+
+        Write a string to file index ind.
+        Optionally indent the string by a number of tabs
+
+        Params
+        ------
+
+        ind: index of the file to write to
+        st: text to write
+        tabs: optional number of tabs to add
+
+    .. py:method:: mitsuba.python.xml.WriteXML.set_filename(name)
+
+        Open the files for output,
+        using filenames based on the given base name.
+        Create the necessary folders to create the file at the specified path.
+
+        Params
+        ------
+
+        name: path to the scene.xml file to write.
+
+    .. py:method:: mitsuba.python.xml.WriteXML.set_output_file(file)
+
+        Switch next output to the given file index
+
+        Params
+        ------
+
+        file: index of the file to start writing to
+
+    .. py:method:: mitsuba.python.xml.WriteXML.write_comment(comment, file=None)
+
+        Write an XML comment to file.
+
+        Params
+        ------
+
+        comment: The text of the comment to write
+        file: Index of the file to write to
+
+    .. py:method:: mitsuba.python.xml.WriteXML.write_header(file, comment=None)
+
+        Write an XML header to a specified file.
+        Optionally add a comment to describe the file.
+
+        Params
+        ------
+
+        file: The file to write to
+        comment: Optional comment to add (e.g. "# Geometry file")
+
+    .. py:method:: mitsuba.python.xml.WriteXML.open_element(name, attributes={}, file=None)
+
+        Open an XML tag (e.g. emitter, bsdf...)
+
+        Params
+        ------
+
+        name: Name of the tag (emitter, bsdf, shape...)
+        attributes: Additional fileds to add to the opening tag (e.g. name, type...)
+        file: File to write to
+
+    .. py:method:: mitsuba.python.xml.WriteXML.close_element(file=None)
+
+        Close the last tag we opened in a given file.
+
+        Params
+        ------
+
+        file: The file to write to
+
+    .. py:method:: mitsuba.python.xml.WriteXML.element(name, attributes={}, file=None)
+
+        Write a single-line XML element.
+
+        Params
+        ------
+
+        name: Name of the element (e.g. integer, string, rotate...)
+        attributes: Additional fields to add to the element (e.g. name, value...)
+        file: The file to write to
+
+    .. py:method:: mitsuba.python.xml.WriteXML.get_plugin_tag(plugin_type)
+
+        Get the corresponding tag of a given plugin (e.g. 'bsdf' for 'diffuse')
+        If the given type (e.g. 'transform') is not a plugin, returns None.
+
+        Params
+        ------
+
+        plugin_type: Name of the type (e.g. 'diffuse', 'ply'...)
+
+    .. py:method:: mitsuba.python.xml.WriteXML.current_tag()
+
+        Get the tag in which we are currently writing
+
+    .. py:method:: mitsuba.python.xml.WriteXML.configure_defaults(scene_dict)
+
+        Traverse the scene graph and look for properties in the defaults dict.
+        For such properties, store their value in a default tag and replace the value by $name in the prop.
+
+        Params
+        ------
+
+        scene_dict: The dictionary containing the scene info
+
+    .. py:method:: mitsuba.python.xml.WriteXML.preprocess_scene(scene_dict)
+
+        Preprocess the scene dictionary before writing it to file:
+            - Add default properties.
+            - Reorder the scene dict before writing it to file.
+            - Separate the dict into different category-specific subdicts.
+            - If not splitting files, merge them in the end.
+
+        Params
+        ------
+
+        scene_dict: The dictionary containing the scene data
+
+    .. py:method:: mitsuba.python.xml.WriteXML.format_spectrum(entry, entry_type)
+
+        Format rgb or spectrum tags to the proper XML output.
+        The entry should contain the name and value of the spectrum entry.
+        The type is passed separately, since it is popped from the dict in write_dict
+
+        Params
+        ------
+
+        entry: the dict containing the spectrum
+        entry_type: either 'spectrum' or 'rgb'
+
+    .. py:method:: mitsuba.python.xml.WriteXML.format_path(filepath, tag)
+
+        Given a filepath, either copy it in the scene folder (in the corresponding directory)
+        or convert it to a relative path.
+
+        Params
+        ------
+
+        filepath: the path to the given file
+        tag: the tag this path property belongs to in (shape, texture, spectrum)
+
+    .. py:method:: mitsuba.python.xml.WriteXML.write_dict(data)
+
+        Main XML writing routine.
+        Given a dictionary, iterate over its entries and write them to file.
+        Calls itself for nested dictionaries.
+
+        Params
+        ------
+
+        data: The dictionary to write to file.
+
+    .. py:method:: mitsuba.python.xml.WriteXML.process(scene_dict)
+
+        Preprocess then write the input dict to XML file format
+
+        Params
+        ------
+
+        scene_dict: The dictionary containing all the scene info.
+
+    .. py:method:: mitsuba.python.xml.WriteXML.transform_matrix(transform)
+
+        Converts a mitsuba Transform4f into a dict entry.
+        This dict entry won't have a 'type' because it's handled in a specific case.
+
+        Params
+        ------
+
+        transform: the given transform matrix
+
+    .. py:method:: mitsuba.python.xml.WriteXML.decompose_transform(transform, export_scale=False)
+
+        Export a transform as a combination of rotation, scale and translation.
+        This helps manually modifying the transform after export (for cameras for instance)
+
+        Params
+        ------
+
+        transform: The Transform4f transform matrix to decompose
+        export_scale: Whether to add a scale property or not. (e.g. don't do it for cameras to avoid clutter)
+
+.. py:function:: mitsuba.python.xml.copy2(src, dst, *, follow_symlinks=True)
+
+    Copy data and metadata. Return the file's destination.
+
+    Metadata is copied with copystat(). Please see the copystat function
+    for more information.
+
+    The destination may be a directory.
+
+    If follow_symlinks is false, symlinks won't be followed. This
+    resembles GNU's "cp -P src dst".
+
+
+.. py:function:: mitsuba.python.xml.dict_to_xml(scene_dict, filename, split_files=False)
 
 .. py:function:: mitsuba.python.test.util.fresolver_append_path(func)
 

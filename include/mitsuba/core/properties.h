@@ -42,8 +42,7 @@ public:
         Bool,              ///< Boolean value (true/false)
         Long,              ///< 64-bit signed integer
         Float,             ///< Floating point value
-        Point3f,           ///< 3D point
-        Vector3f,          ///< 3D vector
+        Array3f,           ///< 3D array
         Transform,         ///< 4x4 transform for homogeneous coordinates
         AnimatedTransform, ///< An animated 4x4 transformation
         Color,             ///< Tristimulus color value
@@ -54,6 +53,7 @@ public:
     };
 
     using Float = float;
+    using Array3f = Array<Float, 3>;
     MTS_IMPORT_CORE_TYPES()
 
     /// Construct an empty property container
@@ -188,9 +188,9 @@ public:  // Type-specific getters and setters ----------------------------------
     /// Store a floating point value in the Properties instance
     void set_float(const std::string &name, const Float &value, bool warn_duplicates = true);
     /// Retrieve a floating point value
-    const Float& float_(const std::string &name) const;
+    Float float_(const std::string &name) const;
     /// Retrieve a floating point value (use default value if no entry exists)
-    const Float& float_(const std::string &name, const Float &def_val) const;
+    Float float_(const std::string &name, const Float &def_val) const;
 
     /// Store a string in the Properties instance
     void set_string(const std::string &name, const std::string &value, bool warn_duplicates = true);
@@ -206,19 +206,22 @@ public:  // Type-specific getters and setters ----------------------------------
     /// Retrieve a named reference value (use default value if no entry exists)
     const NamedReference& named_reference(const std::string &name, const NamedReference &def_val) const;
 
-    /// Store a 3D vector in the Properties instance
-    void set_vector3f(const std::string &name, const Vector3f &value, bool warn_duplicates = true);
-    /// Retrieve a 3D vector
-    const Vector3f& vector3f(const std::string &name) const;
-    /// Retrieve a 3D vector (use default value if no entry exists)
-    const Vector3f& vector3f(const std::string &name, const Vector3f &def_val) const;
+    /// Store a 3D array in the Properties instance
+    void set_array3f(const std::string &name, const Array3f &value, bool warn_duplicates = true);
+    /// Retrieve a 3D array
+    Array3f array3f(const std::string &name) const;
+    /// Retrieve a 3D array (use default value if no entry exists)
+    Array3f array3f(const std::string &name, const Array3f &def_val) const;
 
-    /// Store a 3D point in the Properties instance
-    void set_point3f(const std::string &name, const Point3f &value, bool warn_duplicates = true);
     /// Retrieve a 3D point
-    const Point3f& point3f(const std::string &name) const;
+    Point3f point3f(const std::string &name) const { return array3f(name); }
     /// Retrieve a 3D point (use default value if no entry exists)
-    const Point3f& point3f(const std::string &name, const Point3f &def_val) const;
+    Point3f point3f(const std::string &name, const Point3f &def_val) const { return array3f(name, def_val); }
+
+    /// Retrieve a 3D vector
+    Vector3f vector3f(const std::string &name) const { return array3f(name); }
+    /// Retrieve a 3D vector (use default value if no entry exists)
+    Vector3f vector3f(const std::string &name, const Vector3f &def_val) const { return array3f(name, def_val); }
 
     /// Store a 4x4 homogeneous coordinate transformation in the Properties instance
     void set_transform(const std::string &name, const Transform4f &value, bool warn_duplicates = true);
@@ -263,47 +266,47 @@ public:  // Type-specific getters and setters ----------------------------------
     /// Retrieve a color (use default value if no entry exists)
     const Color3f& color(const std::string &name, const Color3f &def_val) const;
 
-    /// Retrieve a texture
+    /// Retrieve a texture (if the property is a float, create a uniform texture instead)
     template <typename Texture>
     ref<Texture> texture(const std::string &name) const {
-        ref<Object> object = find_object(name);
-        if (!object)
+        if (!has_property(name))
             Throw("Property \"%s\" has not been specified!", name);
-        if (!object->class_()->derives_from(MTS_CLASS(Texture)))
+
+        auto p_type = type(name);
+        if (p_type == Properties::Type::Object) {
+            ref<Object> object = find_object(name);
+            if (!object->class_()->derives_from(MTS_CLASS(Texture)))
+                Throw("The property \"%s\" has the wrong type (expected "
+                    " <spectrum> or <texture>).", name);
+            mark_queried(name);
+            return (Texture *) object.get();
+        } else if (p_type == Properties::Type::Float) {
+            Properties props("uniform");
+            props.set_float("value", float_(name));
+            return (Texture *) PluginManager::instance()->create_object<Texture>(props).get();
+        } else {
             Throw("The property \"%s\" has the wrong type (expected "
-                " <spectrum> or <texture>).", name);
-        mark_queried(name);
-        return (Texture *) object.get();
+                    " <spectrum> or <texture>).", name);
+        }
     }
 
-
-    /// Retrieve a texture (use the provided spectrum if no entry exists)
+    /// Retrieve a texture (use the provided texture if no entry exists)
     template <typename Texture>
     ref<Texture> texture(const std::string &name, ref<Texture> def_val) const {
-        ref<Object> object = find_object(name);
-        if (!object)
+        if (!has_property(name))
             return def_val;
-        if (!object->class_()->derives_from(MTS_CLASS(Texture)))
-            Throw("The property \"%s\" has the wrong type (expected "
-                " <spectrum> or <texture>).", name);
-        mark_queried(name);
-        return (Texture *) object.get();
+        return texture<Texture>(name);
     }
 
-    /// Retrieve a continuous spectrum (or create flat spectrum with default value)
+    /// Retrieve a texture (or create uniform texture with default value)
     template <typename Texture>
     ref<Texture> texture(const std::string &name, Float def_val) const {
-        ref<Object> object = find_object(name);
-        if (!object) {
+        if (!has_property(name)) {
             Properties props("uniform");
             props.set_float("value", def_val);
             return (Texture *) PluginManager::instance()->create_object<Texture>(props).get();
         }
-        if (!object->class_()->derives_from(MTS_CLASS(Texture)))
-            Throw("The property \"%s\" has the wrong type (expected "
-                " <spectrum> or <texture>).", name);
-        mark_queried(name);
-        return (Texture *) object.get();
+        return texture<Texture>(name);
     }
 
     /// Retrieve a 3D texture

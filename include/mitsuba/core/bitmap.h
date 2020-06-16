@@ -163,6 +163,20 @@ public:
     };
 
 
+
+    /// Type of alpha transformation
+    enum class AlphaTransform : uint32_t {
+        /// No transformation (default)
+        None,
+
+        // Premultiply channels by alpha
+        Premultiply,
+
+        // Unpremultiply (divide) channels by alpha
+        Unpremultiply
+    };
+
+
     // ======================================================================
     //! @{ \name Constructors
     // ======================================================================
@@ -277,6 +291,12 @@ public:
 
     /// Specify whether the bitmap uses an sRGB gamma encoding
     void set_srgb_gamma(bool value);
+
+    /// Return whether the bitmap uses premultiplied alpha
+    bool premultiplied_alpha() const { return m_premultiplied_alpha; }
+
+    /// Specify whether the bitmap uses premultiplied alpha
+    void set_premultiplied_alpha(bool value);
 
     /// Return a \ref Properties object containing the image metadata
     Properties &metadata() { return m_metadata; }
@@ -479,7 +499,8 @@ public:
      */
     ref<Bitmap> convert(PixelFormat pixel_format,
                         Struct::Type component_format,
-                        bool srgb_gamma = true) const;
+                        bool srgb_gamma,
+                        Bitmap::AlphaTransform alpha_transform = Bitmap::AlphaTransform::None) const;
 
     void convert(Bitmap *target) const;
 
@@ -617,6 +638,7 @@ public:
      Vector2u m_size;
      ref<Struct> m_struct;
      bool m_srgb_gamma;
+     bool m_premultiplied_alpha;
      bool m_owns_data;
      Properties m_metadata;
 };
@@ -640,7 +662,7 @@ void accumulate_2d(ConstT source,
                    Point<int, 2> source_offset,
                    Point<int, 2> target_offset,
                    Vector<int, 2> size,
-                   int channel_count) {
+                   size_t channel_count) {
     using Value = std::decay_t<T>;
 
     /// Clip against bounds of source and target image
@@ -653,7 +675,7 @@ void accumulate_2d(ConstT source,
     if (any(size <= 0))
         return;
 
-    int n = size.x() * channel_count;
+    int n = (int) (size.x() * channel_count);
 
     if constexpr (std::is_pointer_v<T>) {
         constexpr Value maxval = std::numeric_limits<Value>::max();
@@ -695,5 +717,6 @@ void accumulate_2d(ConstT source,
 
 extern MTS_EXPORT_CORE std::ostream &operator<<(std::ostream &os, Bitmap::PixelFormat value);
 extern MTS_EXPORT_CORE std::ostream &operator<<(std::ostream &os, Bitmap::FileFormat value);
+extern MTS_EXPORT_CORE std::ostream &operator<<(std::ostream &os, Bitmap::AlphaTransform value);
 
 NAMESPACE_END(mitsuba)

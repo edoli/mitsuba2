@@ -15,6 +15,11 @@
 #include <mitsuba/render/scene.h>
 #include <tbb/task_scheduler_init.h>
 
+#if defined(MTS_ENABLE_OPTIX)
+#include <mitsuba/render/optix_api.h>
+#endif
+
+
 #if !defined(__WINDOWS__)
 #  include <signal.h>
 #endif
@@ -82,7 +87,7 @@ bool render(Object *scene_, size_t sensor_i, filesystem::path filename) {
 
     auto integrator = scene->integrator();
     if (!integrator)
-        Throw("No integrator specified for scene: %s", scene->to_string());
+        Throw("No integrator specified for scene: %s", scene);
 
     /* critical section */ {
         std::lock_guard<std::mutex> guard(develop_callback_mutex);
@@ -169,8 +174,13 @@ int main(int argc, char *argv[]) {
             arg_define = arg_define->next();
         }
         std::string mode = (*arg_mode ? arg_mode->as_string() : MTS_DEFAULT_VARIANT);
-        if (string::starts_with(mode, "gpu"))
+
+#if defined(MTS_ENABLE_OPTIX)
+        if (string::starts_with(mode, "gpu")) {
             cie_alloc();
+            optix_initialize();
+        }
+#endif
 
         size_t sensor_i  = (*arg_sensor_i ? arg_sensor_i->as_int() : 0);
 
@@ -189,12 +199,11 @@ int main(int argc, char *argv[]) {
             fr->append(base_path);
 
         if (!*arg_extra || *arg_help) {
-            help(__global_thread_count);
+            help((int) __global_thread_count);
         } else {
-            Log(Info, "%s", util::info_build(__global_thread_count));
+            Log(Info, "%s", util::info_build((int) __global_thread_count));
             Log(Info, "%s", util::info_copyright());
             Log(Info, "%s", util::info_features());
-            Log(Info, "Using mode \"%s\"", mode);
 
 #if !defined(NDEBUG)
             Log(Warn, "Renderer is compiled in debug mode, performance will be considerably reduced.");
@@ -264,5 +273,8 @@ int main(int argc, char *argv[]) {
     Thread::static_shutdown();
     Class::static_shutdown();
     Jit::static_shutdown();
+#if defined(MTS_ENABLE_OPTIX)
+    optix_shutdown();
+#endif
     return error_msg.empty() ? 0 : -1;
 }
