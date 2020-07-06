@@ -96,7 +96,7 @@ public:
         Spectrum spec_weight;
 
         if constexpr (is_spectral_v<Spectrum>) {
-            std::tie(wavelength, spec_weight) = m_radiance->sample(
+            std::tie(wavelength, spec_weight) = m_radiance->sample_spectrum(
                 si, math::sample_shifted<Wavelength>(wavelength_sample), active);
         } else {
             wavelength = zero<Wavelength>();
