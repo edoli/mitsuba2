@@ -255,6 +255,7 @@ public:
 #endif
         return true;
     }
+
     ref<Bitmap> bitmap(bool raw = false) {
         if constexpr (is_cuda_array_v<Float>) {
             cuda_eval();
@@ -267,15 +268,24 @@ public:
         }
 
 
-        ref<Bitmap> source = new Bitmap(
-            m_channels.size() != 5 ? Bitmap::PixelFormat::MultiChannel
-                                   : Bitmap::PixelFormat::XYZAW,
-            struct_type_v<ScalarFloat>, block->size(),
-            block->channel_count(),
-            (uint8_t *) block->data().managed().data());
+        ref<Bitmap> source;
 
-        if (raw)
+        if (raw) {
+            source = new Bitmap(m_channels.size() != 5
+                                ? Bitmap::PixelFormat::MultiChannel
+                                : Bitmap::PixelFormat::XYZAW,
+                                struct_type_v<ScalarFloat>, block->size(),
+                                block->channel_count());
+            memcpy(source->data(), (uint8_t *) block->data().managed().data(), source->buffer_size());
             return source;
+        } else {
+            source = new Bitmap(m_channels.size() != 5
+                                ? Bitmap::PixelFormat::MultiChannel
+                                : Bitmap::PixelFormat::XYZAW,
+                                struct_type_v<ScalarFloat>, block->size(),
+                                block->channel_count(),
+                                (uint8_t *) block->data().managed().data());
+        }
 
         bool has_aovs = m_channels.size() != 5;
 
@@ -445,7 +455,7 @@ public:
         std::string fn = buffer;
         fs::path filepath(fn);
         filepath.replace_extension(filename.extension());
-        bitmap2(false, 0)->write(filepath, m_file_format);
+        bitmap2(m_is_raw, 0)->write(filepath, m_file_format);
     }
 
     bool destination_exists(const fs::path &base_name) const override {
